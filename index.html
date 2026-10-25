@@ -474,6 +474,23 @@ function esc(s) {
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+/* ===== HELPER TANGGAL LOKAL ===== */
+function getLocalDateStr(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseLocalDateStr(dateStr) {
+  if (!dateStr) return new Date();
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const parts = dateStr.split('-');
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  }
+  return new Date(dateStr);
+}
+
 /* ===== JADWAL PER HARI ===== */
 const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 function getScheduleForDay(dayOfWeek) {
@@ -483,7 +500,7 @@ function getScheduleForDay(dayOfWeek) {
 }
 function getScheduleForDate(dateStr) {
   if (!dateStr) return getScheduleForDay(new Date().getDay());
-  const d = new Date(dateStr);
+  const d = parseLocalDateStr(dateStr);
   if (isNaN(d.getTime())) return getScheduleForDay(new Date().getDay());
   return getScheduleForDay(d.getDay());
 }
@@ -627,10 +644,10 @@ function renderMeetingForm() {
   }
   if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = { date:'', hour:1, material:'' };
   const d = c.meetingsData[currentMeeting];
-  const today = new Date().toISOString().slice(0,10);
+  const today = getLocalDateStr();
   const meetingDate = d.date || today;
   const schedForDate = getScheduleForDate(meetingDate).slice().sort((a,b) => a.hour - b.hour);
-  const dayOfWeek = new Date(meetingDate).getDay();
+  const dayOfWeek = parseLocalDateStr(meetingDate).getDay();
   const dayName = DAY_NAMES[dayOfWeek];
   const cat = getDayCategory(dayOfWeek);
   const catLabel = getDayCategoryLabel(cat);
@@ -689,7 +706,7 @@ function onDateChange() {
   c.meetingsData[currentMeeting].hour = +sel.value;
   saveState();
   renderMeetingForm();
-  toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[new Date(newDate).getDay()]}`);
+  toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[parseLocalDateStr(newDate).getDay()]}`);
 }
 
 function autoDetectHour() {
@@ -1204,7 +1221,7 @@ function downloadHTML() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const safeSchool = state.schoolName.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').substring(0, 30);
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = getLocalDateStr();
     a.href = url;
     a.download = `Absensi_${safeSchool}_${dateStr}.html`;
     document.body.appendChild(a);
@@ -1303,7 +1320,7 @@ function addMeeting() {
     c.attendance[st.id][currentMeeting] = c.attendance[st.id][currentMeeting] || 'H';
   });
   const today = new Date();
-  c.meetingsData[currentMeeting] = { date: today.toISOString().slice(0,10), hour: detectedHour, material: '' };
+  c.meetingsData[currentMeeting] = { date: getLocalDateStr(today), hour: detectedHour, material: '' };
   render();
   toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[today.getDay()]}, Jam Ke-${detectedHour}`);
 }
@@ -1378,7 +1395,7 @@ function buildRekapHTML(c) {
     const d = c.meetingsData[m] || {};
     let hariTgl = '-';
     if (d.date) {
-      const dt = new Date(d.date);
+      const dt = parseLocalDateStr(d.date);
       if (!isNaN(dt.getTime())) hariTgl = DAY_NAMES[dt.getDay()] + ', ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
     }
     const schedForM = getScheduleForDate(d.date);
@@ -1513,7 +1530,7 @@ function exportExcel() {
         const sc = schedForM.find(x => x.hour === d.hour);
         let hariTgl = '-';
         if (d.date) {
-          const dt = new Date(d.date);
+          const dt = parseLocalDateStr(d.date);
           if (!isNaN(dt.getTime())) hariTgl = DAY_NAMES[dt.getDay()] + ' ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
         }
         materi.push({
@@ -1526,7 +1543,7 @@ function exportExcel() {
     }
   });
   if (!any) { toast('Belum ada data siswa untuk diexport', 'error'); return; }
-  XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${getLocalDateStr()}.xlsx`);
   toast('✅ Excel diunduh');
 }
 
