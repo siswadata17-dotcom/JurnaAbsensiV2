@@ -393,16 +393,16 @@ function getEmbeddedState() {
 }
 
 function loadState() {
-  const embedded = getEmbeddedState();
-  if (embedded && embedded.classes) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(embedded)); } catch(e) {}
-    return migrateState(embedded);
-  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const legacy = !raw ? (localStorage.getItem('absensiSiswa_v13') || localStorage.getItem('absensiSiswa_v12') || localStorage.getItem('absensiSiswa_v11') || localStorage.getItem('absensiSiswa_v10') || localStorage.getItem('absensiSiswa_v9') || localStorage.getItem('absensiSiswa_v8') || localStorage.getItem('absensiSiswa_v7') || localStorage.getItem('absensiSiswa_v6') || localStorage.getItem('absensiSiswa_v5')) : raw;
     if (legacy) return migrateState(JSON.parse(legacy));
   } catch(e) {}
+  const embedded = getEmbeddedState();
+  if (embedded && embedded.classes) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(embedded)); } catch(e) {}
+    return migrateState(embedded);
+  }
   return defaultState();
 }
 
@@ -476,6 +476,20 @@ function esc(s) {
 
 /* ===== JADWAL PER HARI ===== */
 const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+function getLocalDateStr(d = new Date()) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+function parseLocalDate(dateStr) {
+  if (!dateStr) return new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const parts = dateStr.split('-').map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date(dateStr);
+}
 function getScheduleForDay(dayOfWeek) {
   if (dayOfWeek === 1) return state.schedule.senin;
   if (dayOfWeek === 5) return state.schedule.jumat;
@@ -483,7 +497,7 @@ function getScheduleForDay(dayOfWeek) {
 }
 function getScheduleForDate(dateStr) {
   if (!dateStr) return getScheduleForDay(new Date().getDay());
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   if (isNaN(d.getTime())) return getScheduleForDay(new Date().getDay());
   return getScheduleForDay(d.getDay());
 }
@@ -504,8 +518,8 @@ function timeToMinutes(timeStr) {
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return 0;
   return parts[0] * 60 + parts[1];
 }
-function detectCurrentHour() {
-  const sched = getSchedule().slice().sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+function detectCurrentHour(dateStr) {
+  const sched = (dateStr ? getScheduleForDate(dateStr) : getSchedule()).slice().sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start));
   if (sched.length === 0) return 1;
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
@@ -516,10 +530,10 @@ function detectCurrentHour() {
   }
   return sched[0].hour;
 }
-function getCurrentHourInfo() {
-  const sched = getSchedule().slice().sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+function getCurrentHourInfo(dateStr) {
+  const sched = (dateStr ? getScheduleForDate(dateStr) : getSchedule()).slice().sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start));
   if (sched.length === 0) return { hour: 1, schedule: {hour:1,start:'-',end:'-'}, status: 'before', nowMins: 0 };
-  const detected = detectCurrentHour();
+  const detected = detectCurrentHour(dateStr);
   const cur = sched.find(s => s.hour === detected) || sched[0];
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
@@ -627,14 +641,14 @@ function renderMeetingForm() {
   }
   if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = { date:'', hour:1, material:'' };
   const d = c.meetingsData[currentMeeting];
-  const today = new Date().toISOString().slice(0,10);
+  const today = getLocalDateStr();
   const meetingDate = d.date || today;
   const schedForDate = getScheduleForDate(meetingDate).slice().sort((a,b) => a.hour - b.hour);
-  const dayOfWeek = new Date(meetingDate).getDay();
+  const dayOfWeek = parseLocalDate(meetingDate).getDay();
   const dayName = DAY_NAMES[dayOfWeek];
   const cat = getDayCategory(dayOfWeek);
   const catLabel = getDayCategoryLabel(cat);
-  const info = getCurrentHourInfo();
+  const info = getCurrentHourInfo(meetingDate);
   const statusText = info.status === 'active' ? '🟢 Sedang berlangsung'
                    : info.status === 'before' ? ' Belum mulai' : '✅ Sudah selesai';
   let opts = '';
@@ -689,14 +703,15 @@ function onDateChange() {
   c.meetingsData[currentMeeting].hour = +sel.value;
   saveState();
   renderMeetingForm();
-  toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[new Date(newDate).getDay()]}`);
+  toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[parseLocalDate(newDate).getDay()]}`);
 }
 
 function autoDetectHour() {
   const c = state.classes[currentClass];
   if (c.meetings === 0) return;
-  const detected = detectCurrentHour();
   if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = {};
+  const dateStr = c.meetingsData[currentMeeting].date || getLocalDateStr();
+  const detected = detectCurrentHour(dateStr);
   c.meetingsData[currentMeeting].hour = detected;
   saveState();
   renderMeetingForm();
@@ -753,6 +768,8 @@ function render() {
       meetings: 0, meetingsData: {}
     });
   }
+  if (currentClass >= state.classes.length) currentClass = 0;
+  if (currentClass < 0) currentClass = 0;
   const c = state.classes[currentClass];
   if (currentMeeting > c.meetings) currentMeeting = Math.max(1, c.meetings);
   renderHeader();
@@ -787,7 +804,7 @@ function renderClassList() {
       </div>
       <div class="class-actions">
         <button class="btn-blue" onclick="startEditClass(${idx})">✏️ Edit</button>
-        <button class="btn-red" onclick="removeClass(${idx})" ${tempClasses.length === 1 ? 'disabled title="Minimal 1 kelas harus ada"' : ''}></button>
+        <button class="btn-red" onclick="removeClass(${idx})" ${tempClasses.length === 1 ? 'disabled title="Minimal 1 kelas harus ada"' : ''}>🗑 Hapus</button>
       </div>
     </div>`;
   });
@@ -1204,7 +1221,7 @@ function downloadHTML() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const safeSchool = state.schoolName.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').substring(0, 30);
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = getLocalDateStr();
     a.href = url;
     a.download = `Absensi_${safeSchool}_${dateStr}.html`;
     document.body.appendChild(a);
@@ -1251,7 +1268,7 @@ function resetData() {
       state = fresh;
       currentClass = 0; currentMeeting = 1;
       saveState(); render();
-      toast(' Data dihapus.');
+      toast('🧹 Data dihapus.');
     }, true
   );
 }
@@ -1280,6 +1297,7 @@ function resetTotal() {
 function cycleStatus(id) {
   const c = state.classes[currentClass];
   if (c.meetings === 0) return;
+  if (!c.attendance[id]) c.attendance[id] = {};
   const cur = c.attendance[id][currentMeeting] || 'H';
   c.attendance[id][currentMeeting] = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur)+1) % STATUS_CYCLE.length];
   render();
@@ -1297,13 +1315,14 @@ function addMeeting() {
   if (c.meetings >= MAX_MEETINGS) { toast(`Maksimal ${MAX_MEETINGS} pertemuan!`, 'error'); return; }
   c.meetings++;
   currentMeeting = c.meetings;
-  const detectedHour = detectCurrentHour();
+  const today = new Date();
+  const todayStr = getLocalDateStr(today);
+  const detectedHour = detectCurrentHour(todayStr);
   c.students.forEach(st => {
     if (!c.attendance[st.id]) c.attendance[st.id] = {};
     c.attendance[st.id][currentMeeting] = c.attendance[st.id][currentMeeting] || 'H';
   });
-  const today = new Date();
-  c.meetingsData[currentMeeting] = { date: today.toISOString().slice(0,10), hour: detectedHour, material: '' };
+  c.meetingsData[currentMeeting] = { date: todayStr, hour: detectedHour, material: '' };
   render();
   toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[today.getDay()]}, Jam Ke-${detectedHour}`);
 }
@@ -1378,7 +1397,7 @@ function buildRekapHTML(c) {
     const d = c.meetingsData[m] || {};
     let hariTgl = '-';
     if (d.date) {
-      const dt = new Date(d.date);
+      const dt = parseLocalDate(d.date);
       if (!isNaN(dt.getTime())) hariTgl = DAY_NAMES[dt.getDay()] + ', ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
     }
     const schedForM = getScheduleForDate(d.date);
@@ -1420,6 +1439,20 @@ function printAllRekap() {
   const list = state.classes.filter(c => c.students.length > 0);
   if (!list.length) { toast('Belum ada kelas berisi siswa', 'error'); return; }
   openPrintWindow(`Rekap Semua Kelas - ${state.schoolName}`, list.map(buildRekapHTML).join(''));
+}
+
+/* ===== EXCEL HELPER ===== */
+function getUniqueSheetName(wb, name) {
+  let cleanName = String(name || 'Sheet').replace(/[\\\/\?\*\[\]:]/g, '').trim();
+  if (!cleanName) cleanName = 'Sheet';
+  let sheetName = cleanName.substring(0, 31);
+  let count = 1;
+  while (wb.SheetNames.includes(sheetName)) {
+    const suffix = `_${count}`;
+    sheetName = cleanName.substring(0, 31 - suffix.length) + suffix;
+    count++;
+  }
+  return sheetName;
 }
 
 /* ===== EXCEL ===== */
@@ -1503,8 +1536,8 @@ function exportExcel() {
       row.H=h; row.S=s; row.I=i; row.A=a;
       return row;
     });
-    const safeName = c.name.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), safeName);
+    const classSheetName = getUniqueSheetName(wb, c.name);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), classSheetName);
     if (c.meetings > 0) {
       const materi = [];
       for (let m=1; m<=c.meetings; m++) {
@@ -1513,7 +1546,7 @@ function exportExcel() {
         const sc = schedForM.find(x => x.hour === d.hour);
         let hariTgl = '-';
         if (d.date) {
-          const dt = new Date(d.date);
+          const dt = parseLocalDate(d.date);
           if (!isNaN(dt.getTime())) hariTgl = DAY_NAMES[dt.getDay()] + ' ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
         }
         materi.push({
@@ -1522,11 +1555,12 @@ function exportExcel() {
           'Materi':d.material||'-'
         });
       }
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(materi), (safeName.substring(0,18)+'-Materi'));
+      const materiSheetName = getUniqueSheetName(wb, `${c.name}-Materi`);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(materi), materiSheetName);
     }
   });
   if (!any) { toast('Belum ada data siswa untuk diexport', 'error'); return; }
-  XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${getLocalDateStr()}.xlsx`);
   toast('✅ Excel diunduh');
 }
 
