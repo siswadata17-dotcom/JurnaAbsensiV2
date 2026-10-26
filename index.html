@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -14,7 +13,13 @@
   .school-info h1 { font-size: 18px; }
   .school-info p { font-size: 12px; opacity: .9; margin-top: 2px; }
   .school-info .teacher { font-size: 12px; margin-top: 4px; background: rgba(255,255,255,.15); display: inline-block; padding: 3px 10px; border-radius: 3px; }
+  .school-badge-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .school-badge { background: rgba(255,255,255,.15); padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+  .sync-badge { padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: background .2s; }
+  .sync-badge.online { background: #10b981; color: #fff; }
+  .sync-badge.pending { background: #f59e0b; color: #fff; }
+  .sync-badge.offline { background: #ef4444; color: #fff; }
+  .sync-badge.syncing { background: #06b6d4; color: #fff; }
   .toolbar { padding: 12px 20px; background: #fafafa; border-bottom: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .toolbar label { font-weight: bold; font-size: 13px; }
   select, button, input, textarea { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; font-family: inherit; background: #fff; }
@@ -139,13 +144,17 @@
     <div class="school-info">
       <h1 id="headerSchool"> SMKN 1 GONDANG</h1>
       <p id="headerSub">Sistem Absensi Siswa • <span id="headerTA">TA 2026/2027</span> • <span id="headerClock">--:--:--</span></p>
-      <div class="teacher" id="headerTeacher">👨🏫 Guru: - | 📖 Mapel: -</div>
+      <div class="teacher" id="headerTeacher">👨‍🏫 Guru: - | 📖 Mapel: -</div>
     </div>
-    <div class="school-badge" id="headerBadge">9 Kelas • 50 Pertemuan</div>
+    <div class="school-badge-group">
+      <div class="sync-badge" id="headerSyncBadge" onclick="syncToGoogleSheet(true)" title="Klik untuk melakukan sinkronisasi manual">☁️ Sync Status</div>
+      <div class="school-badge" id="headerBadge">9 Kelas • 50 Pertemuan</div>
+    </div>
   </header>
 
   <div class="toolbar">
     <button class="btn-dark" onclick="openSettingsModal()">⚙️ Settings</button>
+    <button class="btn-green" onclick="syncToGoogleSheet(true)">☁️ Sync Sekarang</button>
     <div class="separator"></div>
     <label>Kelas:</label>
     <select id="classSelect"></select>
@@ -243,6 +252,23 @@
       <input type="text" id="setNip" maxlength="30">
     </div>
 
+    <div class="section-title">📊 Google Spreadsheet / Apps Script Auto Sync</div>
+    <div class="form-group">
+      <label>Google Apps Script Web App URL</label>
+      <input type="text" id="setGoogleScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="form-hint">Masukkan URL hasil Web App Deployment dari Google Apps Script.</div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:bold; cursor:pointer;">
+        <input type="checkbox" id="setAutoSyncSheet" style="width:auto; margin:0;">
+        <span>Aktifkan Sync Otomatis setiap ada perubahan (Simpan offline & sync saat online)</span>
+      </label>
+    </div>
+    <div class="schedule-actions" style="margin-bottom:15px;">
+      <button class="btn-green" onclick="syncToGoogleSheet(true)">☁️ Sync Sekarang</button>
+      <button class="btn-purple" onclick="openAppsScriptGuideModal()">📖 Panduan & Kode Apps Script</button>
+    </div>
+
     <div class="section-title"> Daftar Kelas (CRUD)</div>
     <p style="font-size:11px; color:#666; margin-bottom:8px;">
       Tambah, edit, atau hapus kelas sesuai kebutuhan. Baris biru = kelas yang sedang aktif.
@@ -335,6 +361,36 @@
   </div>
 </div>
 
+<!-- Modal Panduan Google Apps Script -->
+<div class="modal-bg" id="appsScriptGuideModal">
+  <div class="modal" style="max-width:700px;">
+    <h3>📖 Panduan Google Apps Script Auto Sync</h3>
+    <p>
+      Ikuti langkah sederhana berikut untuk menghubungkan sistem absensi ini ke Google Spreadsheet secara otomatis:
+    </p>
+    <ol style="font-size:12px; margin-left:20px; line-height:1.6; color:#444;">
+      <li>Buka <a href="https://sheets.google.com" target="_blank">Google Spreadsheet</a> baru.</li>
+      <li>Klik menu <b>Ekstensi</b> &rarr; <b>Apps Script</b>.</li>
+      <li>Hapus semua kode yang ada, lalu salin (copy) kode Apps Script di bawah ini:</li>
+    </ol>
+    <div style="margin:10px 0;">
+      <textarea id="appsScriptCodeSnippet" readonly style="width:100%; height:160px; font-family:monospace; font-size:11px; background:#f3f4f6;" onclick="this.select()"></textarea>
+      <button class="btn-blue" style="margin-top:5px; font-size:12px;" onclick="copyAppsScriptCode()">📋 Salin Kode Apps Script</button>
+    </div>
+    <ol start="4" style="font-size:12px; margin-left:20px; line-height:1.6; color:#444;">
+      <li>Klik ikon 💾 <b>Simpan</b> (Save project).</li>
+      <li>Klik tombol <b>Terapkan</b> (Deploy) di sudut kanan atas &rarr; pilih <b>Penerapan baru</b> (New deployment).</li>
+      <li>Pilih jenis: <b>Aplikasi Web</b> (Web app).</li>
+      <li>Atur <b>Yang memiliki akses</b> (Who has access) menjadi: <b>Siapa saja</b> (Anyone).</li>
+      <li>Klik <b>Terapkan</b> (Deploy), berikan izin akses (Authorize access), lalu salin <b>URL Aplikasi Web</b> (Web app URL).</li>
+      <li>Tempelkan (paste) URL tersebut pada kolom <b>Google Apps Script Web App URL</b> di Pengaturan.</li>
+    </ol>
+    <div class="modal-actions" style="margin-top:15px;">
+      <button class="btn-gray" onclick="closeAppsScriptGuideModal()">Tutup</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Konfirmasi -->
 <div class="modal-bg" id="modal">
   <div class="modal">
@@ -401,6 +457,8 @@ let isSyncing = false;
 let tempSchedule = { senin: [], selasa_kamis: [], jumat: [] };
 let tempSubjects = [];
 let tempClasses = [];
+let syncTimer = null;
+let isSyncing = false;
 
 function defaultState() {
   const classes = [];
@@ -421,6 +479,10 @@ function defaultState() {
     nip: '',
     googleScriptUrl: '',
     autoSyncSheet: true,
+ auto-sync-offline-absensi-1840414815707528244
+    pendingSync: false,
+
+main
     subjects: [...DEFAULT_SUBJECTS],
     printSettings: { paperSize: 'A4', orientation: 'portrait' },
     schedule: {
@@ -465,6 +527,10 @@ function migrateState(s) {
   if (!s.nip) s.nip = '';
   if (s.googleScriptUrl === undefined) s.googleScriptUrl = '';
   if (s.autoSyncSheet === undefined) s.autoSyncSheet = true;
+auto-sync-offline-absensi-1840414815707528244
+  if (s.pendingSync === undefined) s.pendingSync = false;
+
+ main
 
   if (!Array.isArray(s.subjects)) {
     const oldSubject = s.subject || 'Informatika';
@@ -516,9 +582,16 @@ function migrateState(s) {
   return s;
 }
 
-function saveState() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-  catch(e) { toast('Penyimpanan penuh! Export Excel segera.', 'error'); }
+function saveState(markPending = false) {
+  if (markPending) {
+    state.pendingSync = true;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch(e) {
+    toast('Penyimpanan penuh! Export Excel segera.', 'error');
+  }
+  renderSyncBadge();
 }
 
 function esc(s) {
@@ -526,6 +599,140 @@ function esc(s) {
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+ auto-sync-offline-absensi-1840414815707528244
+/* ===== GOOGLE SPREADSHEET SYNC LOGIC ===== */
+function renderSyncBadge() {
+  const badge = document.getElementById('headerSyncBadge');
+  if (!badge) return;
+  const isOnline = navigator.onLine;
+  const url = (state.googleScriptUrl || '').trim();
+
+  if (isSyncing) {
+    badge.className = 'sync-badge syncing';
+    badge.textContent = '🔄 Syncing...';
+    badge.title = 'Sedang mengirim data ke Google Spreadsheet...';
+  } else if (!url) {
+    badge.className = 'sync-badge offline';
+    badge.textContent = '☁️ Off (No URL)';
+    badge.title = 'Google Apps Script URL belum diatur di Settings';
+  } else if (!isOnline) {
+    badge.className = 'sync-badge offline';
+    badge.textContent = state.pendingSync ? '⚡ Offline (Pending)' : '⚡ Offline';
+    badge.title = 'Perangkat sedang offline. Perubahan akan disinkronkan otomatis saat terhubung internet.';
+  } else if (state.pendingSync) {
+    badge.className = 'sync-badge pending';
+    badge.textContent = '⏳ Pending Sync';
+    badge.title = 'Ada data belum tersinkronisasi. Klik untuk sync sekarang.';
+  } else {
+    badge.className = 'sync-badge online';
+    badge.textContent = '✅ Synced';
+    badge.title = 'Semua data tersimpan & tersinkronisasi dengan Google Spreadsheet.';
+  }
+}
+
+function triggerAutoSync() {
+  if (state.autoSyncSheet === false) return;
+  if (!state.googleScriptUrl || !state.googleScriptUrl.trim()) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncToGoogleSheet(false);
+  }, 1200);
+}
+
+function syncToGoogleSheet(isManual = true) {
+  const url = (state.googleScriptUrl || '').trim();
+  if (!url) {
+    if (isManual) toast('URL Google Apps Script belum diatur di Settings!', 'error');
+    renderSyncBadge();
+    return;
+  }
+  if (!navigator.onLine) {
+    if (isManual) toast('Perangkat sedang offline! Sync akan berjalan saat terhubung internet.', 'error');
+    renderSyncBadge();
+    return;
+  }
+  if (isSyncing) {
+    if (isManual) toast('Sedang melakukan sinkronisasi...', 'error');
+    return;
+  }
+
+  isSyncing = true;
+  renderSyncBadge();
+  if (isManual) toast('🔄 Menghubungkan ke Google Spreadsheet...');
+
+  const payload = {
+    schoolName: state.schoolName || '',
+    schoolAddress: state.schoolAddress || '',
+    academicYear: state.academicYear || '',
+    teacherName: state.teacherName || '',
+    nip: state.nip || '',
+    subjects: state.subjects || [],
+    syncTime: new Date().toLocaleString('id-ID'),
+    classes: state.classes.map(c => {
+      const meetingsDataExt = {};
+      for (let m = 1; m <= c.meetings; m++) {
+        const d = c.meetingsData[m] || {};
+        const schedForM = getScheduleForDate(d.date);
+        const sc = schedForM.find(x => x.hour === d.hour);
+        meetingsDataExt[m] = {
+          date: d.date || '',
+          hour: d.hour || '',
+          waktu: sc ? `${sc.start} - ${sc.end}` : '-',
+          material: d.material || ''
+        };
+      }
+      return {
+        id: c.id,
+        name: c.name,
+        subject: c.subject,
+        students: c.students || [],
+        attendance: c.attendance || {},
+        meetings: c.meetings || 0,
+        meetingsData: meetingsDataExt
+      };
+    })
+  };
+
+  fetch(url, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(() => {
+    isSyncing = false;
+    state.pendingSync = false;
+    saveState(false);
+    toast('✅ Sync Google Spreadsheet berhasil!');
+  })
+  .catch(err => {
+    isSyncing = false;
+    renderSyncBadge();
+    if (isManual) toast('Gagal sync: ' + err.message, 'error');
+  });
+}
+
+window.addEventListener('online', () => {
+  renderSyncBadge();
+  toast('🌐 Terhubung ke internet! Memulai sync otomatis...');
+  if (state.pendingSync || state.autoSyncSheet !== false) {
+    syncToGoogleSheet(false);
+  }
+});
+
+window.addEventListener('offline', () => {
+  renderSyncBadge();
+  toast('⚡ Koneksi terputus. Mode OFFLINE aktif.', 'error');
+});
+
+window.addEventListener('focus', () => {
+  renderSyncBadge();
+  if (navigator.onLine && state.pendingSync && state.autoSyncSheet !== false) {
+    syncToGoogleSheet(false);
+  }
+});
+
+=======
 /* ===== HELPER TANGGAL LOKAL ===== */
 function getLocalDateStr(date = new Date()) {
   const y = date.getFullYear();
@@ -541,8 +748,7 @@ function parseLocalDateStr(dateStr) {
     return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
   }
   return new Date(dateStr);
-}
-
+} main
 /* ===== JADWAL PER HARI ===== */
 const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 function getScheduleForDay(dayOfWeek) {
@@ -619,8 +825,9 @@ function renderHeader() {
   document.getElementById('headerTA').textContent = 'TA ' + state.academicYear;
   const teacher = state.teacherName || '-';
   const subject = state.classes[currentClass] ? state.classes[currentClass].subject || '-' : '-';
-  document.getElementById('headerTeacher').textContent = `‍🏫 Guru: ${teacher} | 📖 Mapel: ${subject}`;
+  document.getElementById('headerTeacher').textContent = `👨‍🏫 Guru: ${teacher} | 📖 Mapel: ${subject}`;
   document.getElementById('headerBadge').textContent = `${state.classes.length} Kelas • ${MAX_MEETINGS} Pertemuan`;
+  renderSyncBadge();
 }
 
 /* ===== RENDER ===== */
@@ -660,9 +867,10 @@ function changeClassSubject(newSubject) {
     return;
   }
   state.classes[currentClass].subject = newSubject;
-  saveState();
+  saveState(true);
   renderHeader();
   toast(`📖 Mapel kelas ${state.classes[currentClass].name} → ${newSubject}`);
+  triggerAutoSync();
 }
 
 function renderInfo() {
@@ -756,9 +964,12 @@ function onDateChange() {
   if (validHours.includes(oldVal)) sel.value = oldVal;
   else if (schedForDate.length > 0) sel.value = schedForDate[0].hour;
   c.meetingsData[currentMeeting].hour = +sel.value;
-  saveState();
-  renderMeetingForm();
+  saveState(true);
+  renderMeetingForm();auto-sync-offline-absensi-1840414815707528244
+  toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[new Date(newDate).getDay()]}`);
+  triggerAutoSync()
   toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[parseLocalDateStr(newDate).getDay()]}`);
+main
 }
 
 function autoDetectHour() {
@@ -767,9 +978,10 @@ function autoDetectHour() {
   const detected = detectCurrentHour();
   if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = {};
   c.meetingsData[currentMeeting].hour = detected;
-  saveState();
+  saveState(true);
   renderMeetingForm();
   toast(`✅ Jam terdeteksi: Jam Ke-${detected}`);
+  triggerAutoSync();
 }
 
 function updateMeetingData() {
@@ -779,7 +991,7 @@ function updateMeetingData() {
   c.meetingsData[currentMeeting].date = document.getElementById('meetingDate').value;
   c.meetingsData[currentMeeting].hour = +document.getElementById('meetingHour').value;
   c.meetingsData[currentMeeting].material = document.getElementById('meetingMaterial').value;
-  saveState();
+  saveState(true);
   toast('✅ Materi & jadwal tersimpan');
   triggerAutoSync();
 }
@@ -831,7 +1043,7 @@ function render() {
   renderInfo();
   renderMeetingForm();
   renderTable();
-  saveState();
+  saveState(false);
 }
 
 /* ===== CRUD KELAS ===== */
@@ -1263,8 +1475,9 @@ function saveSettings() {
   });
   if (currentClass >= state.classes.length) currentClass = 0;
 
-  saveState(); render(); closeSettingsModal();
+  saveState(true); render(); closeSettingsModal();
   toast('✅ Semua pengaturan disimpan');
+  triggerAutoSync();
 }
 
 /* ===== DOWNLOAD HTML ===== */
@@ -1317,6 +1530,8 @@ function resetData() {
       fresh.academicYear = state.academicYear;
       fresh.teacherName = state.teacherName;
       fresh.nip = state.nip;
+      fresh.googleScriptUrl = state.googleScriptUrl;
+      fresh.autoSyncSheet = state.autoSyncSheet;
       fresh.subjects = [...state.subjects];
       fresh.printSettings = { ...state.printSettings };
       fresh.schedule = JSON.parse(JSON.stringify(state.schedule));
@@ -1326,8 +1541,9 @@ function resetData() {
       }));
       state = fresh;
       currentClass = 0; currentMeeting = 1;
-      saveState(); render();
+      saveState(true); render();
       toast(' Data dihapus.');
+      triggerAutoSync();
     }, true
   );
 }
@@ -1341,13 +1557,16 @@ function resetTotal() {
       fresh.academicYear = state.academicYear;
       fresh.teacherName = state.teacherName;
       fresh.nip = state.nip;
+      fresh.googleScriptUrl = state.googleScriptUrl;
+      fresh.autoSyncSheet = state.autoSyncSheet;
       fresh.subjects = [...state.subjects];
       fresh.printSettings = { ...state.printSettings };
       fresh.schedule = JSON.parse(JSON.stringify(state.schedule));
       state = fresh;
       currentClass = 0; currentMeeting = 1;
-      saveState(); render();
+      saveState(true); render();
       toast('🗑 Reset total selesai');
+      triggerAutoSync();
     }, true
   );
 }
@@ -1359,14 +1578,21 @@ function cycleStatus(id) {
   const cur = c.attendance[id][currentMeeting] || 'H';
   c.attendance[id][currentMeeting] = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur)+1) % STATUS_CYCLE.length];
   render();
+  auto-sync-offline-absensi-1840414815707528244
+  saveState(true);
+ main
   triggerAutoSync();
 }
 function deleteStudent(id) {
   showConfirm('Hapus Siswa', 'Yakin ingin menghapus siswa ini?', () => {
     const c = state.classes[currentClass];
     c.students = c.students.filter(s => s.id !== id);
-    delete c.attendance[id];
+    delete c.attendance[id];auto-sync-offline-absensi-1840414815707528244
+    render();
+    saveState(true);
+    toast('Siswa dihapus');
     render(); toast('Siswa dihapus');
+main
     triggerAutoSync();
   }, false);
 }
@@ -1383,6 +1609,7 @@ function addMeeting() {
   const today = new Date();
   c.meetingsData[currentMeeting] = { date: getLocalDateStr(today), hour: detectedHour, material: '' };
   render();
+  saveState(true);
   toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[today.getDay()]}, Jam Ke-${detectedHour}`);
   triggerAutoSync();
 }
@@ -1545,6 +1772,7 @@ function handleFile(e) {
         });
       });
       render();
+      saveState(true);
       toast(`✅ ${count} siswa berhasil diimpor`);
       triggerAutoSync();
     } catch(err) { toast('Gagal: ' + err.message, 'error'); }
@@ -1637,6 +1865,7 @@ function showConfirm(title, msg, onOk, keepIdentity=false) {
   document.getElementById('modalOk').onclick = () => { closeModal(); onOk(); };
 }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
+auto-sync-offline-absensi-184041481570752824 main
 function openAppsScriptGuideModal() {
   const code = `function doPost(e) {
   try {
@@ -1737,9 +1966,13 @@ function openAppsScriptGuideModal() {
   document.getElementById('appsScriptCodeSnippet').value = code;
   document.getElementById('appsScriptGuideModal').classList.add('show');
 }
+auto-sync-offline-absensi-1840414815707528244
+
 function closeAppsScriptGuideModal() {
   document.getElementById('appsScriptGuideModal').classList.remove('show');
-}
+function closeAppsScriptGuideModal() {
+  document.getElementById('appsScriptGuideModal').classList.remove('show');
+} main
 function copyAppsScriptCode() {
   const codeEl = document.getElementById('appsScriptCodeSnippet');
   codeEl.select();
@@ -1749,7 +1982,7 @@ function copyAppsScriptCode() {
     document.execCommand('copy');
     toast('✅ Kode Apps Script berhasil disalin!');
   });
-}
+  auto-sync-offline-absensi-184041481570752824main
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeSettingsModal(); closeAppsScriptGuideModal(); }
 });
