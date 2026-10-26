@@ -751,6 +751,24 @@ function parseLocalDateStr(dateStr) {
 } main
 /* ===== JADWAL PER HARI ===== */
 const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const MONTH_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+function getLocalDateString(d = new Date()) {
+  const dt = (d instanceof Date && !isNaN(d.getTime())) ? d : new Date();
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatFullLocalDate(d = new Date()) {
+  const dt = (d instanceof Date && !isNaN(d.getTime())) ? d : new Date();
+  const dayName = DAY_NAMES[dt.getDay()];
+  const dateNum = dt.getDate();
+  const monthName = MONTH_NAMES[dt.getMonth()];
+  const yearNum = dt.getFullYear();
+  return `${dayName}, ${dateNum} ${monthName} ${yearNum}`;
+}
 function getScheduleForDay(dayOfWeek) {
   if (dayOfWeek === 1) return state.schedule.senin;
   if (dayOfWeek === 5) return state.schedule.jumat;
@@ -809,11 +827,23 @@ function formatClock() {
   const now = new Date();
   return [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2,'0')).join(':');
 }
+let lastKnownDateStr = '';
 function startClock() {
   if (clockInterval) clearInterval(clockInterval);
   const update = () => {
+    const now = new Date();
+    const currentDateStr = getLocalDateString(now);
     const el = document.getElementById('headerClock');
-    if (el) el.textContent = '🕐 ' + formatClock();
+    if (el) el.textContent = '📅 ' + formatFullLocalDate(now) + ' • 🕐 ' + formatClock();
+
+    if (lastKnownDateStr && lastKnownDateStr !== currentDateStr) {
+      lastKnownDateStr = currentDateStr;
+      if (typeof renderMeetingForm === 'function') {
+        renderMeetingForm();
+      }
+    } else if (!lastKnownDateStr) {
+      lastKnownDateStr = currentDateStr;
+    }
   };
   update();
   clockInterval = setInterval(update, 1000);
@@ -827,7 +857,11 @@ function renderHeader() {
   const subject = state.classes[currentClass] ? state.classes[currentClass].subject || '-' : '-';
   document.getElementById('headerTeacher').textContent = `👨‍🏫 Guru: ${teacher} | 📖 Mapel: ${subject}`;
   document.getElementById('headerBadge').textContent = `${state.classes.length} Kelas • ${MAX_MEETINGS} Pertemuan`;
+sync-device-meeting-date-2514376755930711128
+  const el = document.getElementById('headerClock');
+  if (el) el.textContent = '📅 ' + formatFullLocalDate() + ' • 🕐 ' + formatClock();
   renderSyncBadge();
+ main
 }
 
 /* ===== RENDER ===== */
@@ -895,19 +929,42 @@ function renderInfo() {
     <span>📅 Pertemuan: <b>${currentMeeting}/${c.meetings}</b></span>`;
 }
 
+function syncMeetingDateToNow() {
+  const c = state.classes[currentClass];
+  if (c.meetings === 0) return;
+  if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = {};
+  const todayStr = getLocalDateString();
+  const detectedHour = detectCurrentHour();
+  c.meetingsData[currentMeeting].date = todayStr;
+  c.meetingsData[currentMeeting].hour = detectedHour;
+  saveState();
+  renderMeetingForm();
+  toast(`📅 Tanggal & Jam disinkronkan ke waktu perangkat: ${formatFullLocalDate()}`);
+}
+
 function renderMeetingForm() {
   const c = state.classes[currentClass];
   const form = document.getElementById('meetingForm');
   if (c.meetings === 0) {
-    form.innerHTML = `<p style="text-align:center;color:#92400e;font-size:13px;">Klik "+ Pertemuan" untuk memulai — jam otomatis terdeteksi sesuai hari ini</p>`;
+    form.innerHTML = `<p style="text-align:center;color:#92400e;font-size:13px;">Klik "+ Pertemuan" untuk memulai — tanggal & jam otomatis sinkron sesuai perangkat Anda</p>`;
     return;
   }
   if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = { date:'', hour:1, material:'' };
   const d = c.meetingsData[currentMeeting];
+sync-device-meeting-date-2514376755930711128
+  const today = getLocalDateString();
+  if (!d.date) {
+    d.date = today;
+  }
+  const meetingDate = d.date;
+  const schedForDate = getScheduleForDate(meetingDate).slice().sort((a,b) => a.hour - b.hour);
+  const dayOfWeek = new Date(meetingDate + 'T00:00:00').getDay();
+
   const today = getLocalDateStr();
   const meetingDate = d.date || today;
   const schedForDate = getScheduleForDate(meetingDate).slice().sort((a,b) => a.hour - b.hour);
   const dayOfWeek = parseLocalDateStr(meetingDate).getDay();
+main
   const dayName = DAY_NAMES[dayOfWeek];
   const cat = getDayCategory(dayOfWeek);
   const catLabel = getDayCategoryLabel(cat);
@@ -922,10 +979,12 @@ function renderMeetingForm() {
   form.innerHTML = `
     <h3>📝 Pertemuan ${currentMeeting} • ${esc(c.subject)}</h3>
     <div class="clock-info">
-      <span>🕐 Waktu sekarang: <b>${formatClock()}</b></span>
+      <span>📅 Perangkat: <b>${formatFullLocalDate()}</b></span>
+      <span>🕐 Waktu: <b>${formatClock()}</b></span>
       <span class="auto-badge">Auto: Jam Ke-${info.hour}</span>
       <span>${statusText}</span>
-      <button class="btn-blue" style="padding:3px 10px; font-size:11px; margin-left:auto;" onclick="autoDetectHour()"> Deteksi Ulang</button>
+      <button class="btn-green" style="padding:3px 10px; font-size:11px; margin-left:auto;" onclick="syncMeetingDateToNow()">🔄 Sinkron Perangkat</button>
+      <button class="btn-blue" style="padding:3px 10px; font-size:11px;" onclick="autoDetectHour()"> Deteksi Ulang Jam</button>
     </div>
     <div class="form-row">
       <div><label>Tanggal Pertemuan</label>
@@ -1492,8 +1551,11 @@ function downloadHTML() {
     const blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const safeSchool = state.schoolName.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').substring(0, 30);
+    const safeSchool = state.schoolName.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').substring(0, 30); sync-device-meeting-date-2514376755930711128
+    const dateStr = getLocalDateString();
+
     const dateStr = getLocalDateStr();
+ main
     a.href = url;
     a.download = `Absensi_${safeSchool}_${dateStr}.html`;
     document.body.appendChild(a);
@@ -1606,12 +1668,20 @@ function addMeeting() {
     if (!c.attendance[st.id]) c.attendance[st.id] = {};
     c.attendance[st.id][currentMeeting] = c.attendance[st.id][currentMeeting] || 'H';
   });
+ sync-device-meeting-date-2514376755930711128
+  const todayStr = getLocalDateString();
+  const todayObj = new Date();
+  c.meetingsData[currentMeeting] = { date: todayStr, hour: detectedHour, material: '' };
+  render();
+  toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[todayObj.getDay()]}, Jam Ke-${detectedHour}`);
+
   const today = new Date();
   c.meetingsData[currentMeeting] = { date: getLocalDateStr(today), hour: detectedHour, material: '' };
   render();
   saveState(true);
   toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[today.getDay()]}, Jam Ke-${detectedHour}`);
   triggerAutoSync();
+main
 }
 function nextMeeting() {
   const c = state.classes[currentClass];
@@ -1834,7 +1904,11 @@ function exportExcel() {
     }
   });
   if (!any) { toast('Belum ada data siswa untuk diexport', 'error'); return; }
+ sync-device-meeting-date-2514376755930711128
+  XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${getLocalDateString()}.xlsx`);
+
   XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${getLocalDateStr()}.xlsx`);
+main
   toast('✅ Excel diunduh');
 }
 
