@@ -152,6 +152,7 @@
     <button class="btn-blue" onclick="importExcel()">📥 Import</button>
     <button class="btn-green" onclick="exportExcel()"> Export</button>
     <button onclick="downloadTemplate()">📋 Template</button>
+    <button class="btn-orange" onclick="syncToGoogleSheets()">☁️ Sync Google</button>
     <div class="separator"></div>
     <button class="btn-cyan" onclick="printRekap(currentClass)">🖨️ Cetak</button>
     <button class="btn-cyan" onclick="printAllRekap()">🖨️ Semua</button>
@@ -237,6 +238,49 @@
       <button class="btn-green" onclick="addSubject()"> Tambah</button>
     </div>
     <div class="form-hint">💡 Minimal 1 mata pelajaran harus ada. Mapel yang sedang dipakai kelas tidak bisa dihapus.</div>
+
+    <div class="section-title">📊 Integrasi Google Spreadsheet</div>
+    <div class="form-group">
+      <label>URL Google Apps Script Web App</label>
+      <input type="text" id="setGoogleScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="form-hint" style="margin-top:4px;">
+        💡 Tempelkan Web App URL dari Deployment Google Apps Script untuk sinkronisasi data absensi secara otomatis.
+      </div>
+      <details style="margin-top:8px; background:#f0f4ff; padding:8px; border-radius:4px; font-size:11px;">
+        <summary style="cursor:pointer; font-weight:bold; color:#2a5298;">📜 Klik di sini untuk melihat Kode Google Apps Script (GAS)</summary>
+        <p style="margin:6px 0;">Salin kode berikut ke Google Apps Script (Extensions &gt; Apps Script pada Google Sheet Anda):</p>
+        <textarea readonly="" style="width:100%; height:120px; font-family:monospace; font-size:10px;" onclick="this.select()">function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    data.classes.forEach(function(c) {
+      var sheetName = c.name.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,30);
+      var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+      sheet.clear();
+      var headers = ["No", "NIS", "Nama"];
+      for (var m = 1; m <= c.meetings; m++) { headers.push("P" + m); }
+      headers.push("H", "S", "I", "A");
+      sheet.appendRow(headers);
+      c.students.forEach(function(st, idx) {
+        var row = [idx + 1, st.nis || "-", st.name];
+        var h=0, s=0, i=0, a=0;
+        for (var m = 1; m <= c.meetings; m++) {
+          var v = (c.attendance[st.id] && c.attendance[st.id][m]) || "H";
+          row.push(v);
+          if (v==="H") h++; else if (v==="S") s++; else if (v==="I") i++; else a++;
+        }
+        row.push(h, s, i, a);
+        sheet.appendRow(row);
+      });
+    });
+    return ContentService.createTextOutput(JSON.stringify({result: "success"})).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({result: "error", error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}</textarea>
+        <p style="margin-top:4px; color:#555;">Deploy sebagai Web App dengan akses <b>"Anyone" (Siapa Saja)</b>.</p>
+      </details>
+    </div>
 
     <div class="section-title">🖨️ Pengaturan Cetak</div>
     <div class="print-settings">
@@ -372,6 +416,7 @@ function defaultState() {
     academicYear: '2026/2027',
     teacherName: '',
     nip: '',
+    googleScriptUrl: '',
     subjects: [...DEFAULT_SUBJECTS],
     printSettings: { paperSize: 'A4', orientation: 'portrait' },
     schedule: {
@@ -414,6 +459,7 @@ function migrateState(s) {
   if (!s.academicYear) s.academicYear = '2026/2027';
   if (!s.teacherName) s.teacherName = '';
   if (!s.nip) s.nip = '';
+  if (!s.googleScriptUrl) s.googleScriptUrl = '';
 
   if (!Array.isArray(s.subjects)) {
     const oldSubject = s.subject || 'Informatika';
@@ -475,8 +521,26 @@ function esc(s) {
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-/* ===== JADWAL PER HARI ===== */
+/* ===== TANGGAL & JADWAL PER HARI ===== */
 const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+
+function parseLocalDate(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function getLocalDateString(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function getScheduleForDay(dayOfWeek) {
   if (dayOfWeek === 1) return state.schedule.senin;
   if (dayOfWeek === 5) return state.schedule.jumat;
@@ -484,8 +548,8 @@ function getScheduleForDay(dayOfWeek) {
 }
 function getScheduleForDate(dateStr) {
   if (!dateStr) return getScheduleForDay(new Date().getDay());
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return getScheduleForDay(new Date().getDay());
+  const d = parseLocalDate(dateStr);
+  if (!d) return getScheduleForDay(new Date().getDay());
   return getScheduleForDay(d.getDay());
 }
 function getDayCategory(dayOfWeek) {
@@ -628,10 +692,11 @@ function renderMeetingForm() {
   }
   if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = { date:'', hour:1, material:'' };
   const d = c.meetingsData[currentMeeting];
-  const today = new Date().toISOString().slice(0,10);
+  const today = getLocalDateString();
   const meetingDate = d.date || today;
   const schedForDate = getScheduleForDate(meetingDate).slice().sort((a,b) => a.hour - b.hour);
-  const dayOfWeek = new Date(meetingDate).getDay();
+  const parsedDt = parseLocalDate(meetingDate) || new Date();
+  const dayOfWeek = parsedDt.getDay();
   const dayName = DAY_NAMES[dayOfWeek];
   const cat = getDayCategory(dayOfWeek);
   const catLabel = getDayCategoryLabel(cat);
@@ -690,7 +755,9 @@ function onDateChange() {
   c.meetingsData[currentMeeting].hour = +sel.value;
   saveState();
   renderMeetingForm();
-  toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[new Date(newDate).getDay()]}`);
+  const parsedDt = parseLocalDate(newDate);
+  const dayIdx = parsedDt ? parsedDt.getDay() : new Date().getDay();
+  toast(`📅 Jadwal diperbarui untuk hari ${DAY_NAMES[dayIdx]}`);
 }
 
 function autoDetectHour() {
@@ -745,17 +812,25 @@ function renderTable() {
 }
 
 function render() {
-  if (state.classes.length === 0) {
-    state.classes.push({
+  if (!state.classes || state.classes.length === 0) {
+    state.classes = [{
       id: 'c_default_' + Date.now(),
       name: 'Kelas 1',
-      subject: state.subjects[0],
+      subject: (state.subjects && state.subjects[0]) || 'Informatika',
       students: [], attendance: {},
       meetings: 0, meetingsData: {}
-    });
+    }];
+  }
+  if (currentClass < 0 || currentClass >= state.classes.length) {
+    currentClass = 0;
   }
   const c = state.classes[currentClass];
-  if (currentMeeting > c.meetings) currentMeeting = Math.max(1, c.meetings);
+  if (c.meetings === 0) {
+    currentMeeting = 1;
+  } else {
+    if (currentMeeting > c.meetings) currentMeeting = c.meetings;
+    if (currentMeeting < 1) currentMeeting = 1;
+  }
   renderHeader();
   renderClassSelect();
   renderSubjectSelect();
@@ -1135,6 +1210,7 @@ function openSettingsModal() {
   document.getElementById('setAcademicYear').value = state.academicYear;
   document.getElementById('setTeacherName').value = state.teacherName || '';
   document.getElementById('setNip').value = state.nip || '';
+  document.getElementById('setGoogleScriptUrl').value = state.googleScriptUrl || '';
   document.getElementById('setPaperSize').value = state.printSettings.paperSize;
   document.querySelectorAll('input[name="setOrientation"]').forEach(r => {
     r.checked = (r.value === state.printSettings.orientation);
@@ -1160,6 +1236,7 @@ function saveSettings() {
   const ta = document.getElementById('setAcademicYear').value.trim();
   const teacher = document.getElementById('setTeacherName').value.trim();
   const nip = document.getElementById('setNip').value.trim();
+  const googleScriptUrl = document.getElementById('setGoogleScriptUrl').value.trim();
   const paperSize = document.getElementById('setPaperSize').value;
   const orientation = document.querySelector('input[name="setOrientation"]:checked').value;
 
@@ -1175,6 +1252,7 @@ function saveSettings() {
   state.academicYear = ta;
   state.teacherName = teacher;
   state.nip = nip;
+  state.googleScriptUrl = googleScriptUrl;
   state.classes = tempClasses;
   state.subjects = [...tempSubjects];
   state.printSettings = { paperSize, orientation };
@@ -1205,7 +1283,7 @@ function downloadHTML() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const safeSchool = state.schoolName.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').substring(0, 30);
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = getLocalDateString();
     a.href = url;
     a.download = `Absensi_${safeSchool}_${dateStr}.html`;
     document.body.appendChild(a);
@@ -1303,10 +1381,11 @@ function addMeeting() {
     if (!c.attendance[st.id]) c.attendance[st.id] = {};
     c.attendance[st.id][currentMeeting] = c.attendance[st.id][currentMeeting] || 'H';
   });
-  const today = new Date();
-  c.meetingsData[currentMeeting] = { date: today.toISOString().slice(0,10), hour: detectedHour, material: '' };
+  const now = new Date();
+  const todayStr = getLocalDateString(now);
+  c.meetingsData[currentMeeting] = { date: todayStr, hour: detectedHour, material: '' };
   render();
-  toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[today.getDay()]}, Jam Ke-${detectedHour}`);
+  toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[now.getDay()]}, Jam Ke-${detectedHour}`);
 }
 function nextMeeting() {
   const c = state.classes[currentClass];
@@ -1379,8 +1458,8 @@ function buildRekapHTML(c) {
     const d = c.meetingsData[m] || {};
     let hariTgl = '-';
     if (d.date) {
-      const dt = new Date(d.date);
-      if (!isNaN(dt.getTime())) hariTgl = DAY_NAMES[dt.getDay()] + ', ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+      const dt = parseLocalDate(d.date);
+      if (dt) hariTgl = DAY_NAMES[dt.getDay()] + ', ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
     }
     const schedForM = getScheduleForDate(d.date);
     const sc = schedForM.find(x => x.hour === d.hour);
@@ -1421,6 +1500,36 @@ function printAllRekap() {
   const list = state.classes.filter(c => c.students.length > 0);
   if (!list.length) { toast('Belum ada kelas berisi siswa', 'error'); return; }
   openPrintWindow(`Rekap Semua Kelas - ${state.schoolName}`, list.map(buildRekapHTML).join(''));
+}
+
+/* ===== SINKRONISASI GOOGLE SPREADSHEET ===== */
+async function syncToGoogleSheets() {
+  if (!state.googleScriptUrl) {
+    toast('⚠️ Masukkan Web App URL Google Apps Script di Settings terlebih dahulu!', 'error');
+    openSettingsModal();
+    return;
+  }
+  toast('⏳ Mengirim data ke Google Spreadsheet...');
+  try {
+    const payload = {
+      action: 'sync',
+      schoolName: state.schoolName,
+      academicYear: state.academicYear,
+      teacherName: state.teacherName,
+      nip: state.nip,
+      classes: state.classes,
+      timestamp: new Date().toISOString()
+    };
+    await fetch(state.googleScriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    toast('✅ Data berhasil dikirim ke Google Spreadsheet!');
+  } catch (err) {
+    toast('❌ Gagal sinkronisasi: ' + err.message, 'error');
+  }
 }
 
 /* ===== EXCEL ===== */
@@ -1514,8 +1623,8 @@ function exportExcel() {
         const sc = schedForM.find(x => x.hour === d.hour);
         let hariTgl = '-';
         if (d.date) {
-          const dt = new Date(d.date);
-          if (!isNaN(dt.getTime())) hariTgl = DAY_NAMES[dt.getDay()] + ' ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+          const dt = parseLocalDate(d.date);
+          if (dt) hariTgl = DAY_NAMES[dt.getDay()] + ' ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
         }
         materi.push({
           'Pertemuan':m, 'Hari / Tanggal':hariTgl, 'Mata Pelajaran': c.subject,
@@ -1527,7 +1636,7 @@ function exportExcel() {
     }
   });
   if (!any) { toast('Belum ada data siswa untuk diexport', 'error'); return; }
-  XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `Absensi_${state.schoolName.replace(/\s+/g,'_')}_TA${state.academicYear.replace(/\//g,'-')}_${getLocalDateString()}.xlsx`);
   toast('✅ Excel diunduh');
 }
 
