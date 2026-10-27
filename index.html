@@ -246,10 +246,19 @@
       <div class="form-hint" style="margin-top:4px;">
         💡 Tempelkan Web App URL dari Deployment Google Apps Script untuk sinkronisasi data absensi secara otomatis.
       </div>
-      <details style="margin-top:8px; background:#f0f4ff; padding:8px; border-radius:4px; font-size:11px;">
-        <summary style="cursor:pointer; font-weight:bold; color:#2a5298;">📜 Klik di sini untuk melihat Kode Google Apps Script (GAS)</summary>
-        <p style="margin:6px 0;">Salin kode berikut ke Google Apps Script (Extensions &gt; Apps Script pada Google Sheet Anda):</p>
-        <textarea readonly="" style="width:100%; height:120px; font-family:monospace; font-size:10px;" onclick="this.select()">function doPost(e) {
+      <details style="margin-top:8px; background:#f0f4ff; padding:10px; border-radius:6px; font-size:11px; border:1px solid #c7d2fe;">
+        <summary style="cursor:pointer; font-weight:bold; color:#2a5298;">📘 Petunjuk Lengkap & Kode Google Apps Script (GAS)</summary>
+
+        <div style="margin-top:8px; line-height:1.6; color:#374151;">
+          <b style="color:#1e3a8a;">Langkah Integrasi Google Spreadsheet & Google Apps Script:</b>
+          <ol style="margin-left:18px; margin-top:4px; margin-bottom:8px;">
+            <li><b>Buat Spreadsheet Baru:</b> Buka <a href="https://sheets.google.com" target="_blank" style="color:#2a5298;">Google Sheets</a> dan buat spreadsheet baru.</li>
+            <li><b>Buka Script Editor:</b> Klik menu <b>Ekstensi (Extensions)</b> &gt; <b>Apps Script</b>.</li>
+            <li><b>Tempelkan Kode:</b> Hapus semua kode default, lalu salin dan tempelkan kode JavaScript di bawah ini:</li>
+          </ol>
+        </div>
+
+        <textarea readonly="" style="width:100%; height:130px; font-family:monospace; font-size:10px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; padding:6px;" onclick="this.select()">function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -278,7 +287,22 @@
     return ContentService.createTextOutput(JSON.stringify({result: "error", error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }</textarea>
-        <p style="margin-top:4px; color:#555;">Deploy sebagai Web App dengan akses <b>"Anyone" (Siapa Saja)</b>.</p>
+
+        <div style="margin-top:8px; line-height:1.6; color:#374151;">
+          <ol start="4" style="margin-left:18px;">
+            <li><b>Simpan & Apply Deployment:</b> Klik tombol <b>Simpan (💾)</b>, lalu klik <b>Penerapan (Deploy)</b> &gt; <b>Penerapan Baru (New deployment)</b>.</li>
+            <li><b>Atur Akses:</b>
+              <ul style="margin-left:16px;">
+                <li>Pilih jenis: <b>Web app</b>.</li>
+                <li>Jalankan sebagai (Execute as): <b>Me (Saya)</b>.</li>
+                <li>Siapa yang memiliki akses (Who has access): <b>Anyone (Siapa saja)</b>.</li>
+              </ul>
+            </li>
+            <li><b>Izinkan Akses:</b> Klik <b>Deploy</b>, lalu klik <i>Authorize access</i> dan izinkan akun Google Anda.</li>
+            <li><b>Salin Web App URL:</b> Salin URL Web App yang berakhiran <code>/exec</code>, lalu tempelkan pada kolom URL di atas dan klik <b>Simpan Semua</b>.</li>
+            <li><b>Mulai Sinkronisasi:</b> Klik tombol <b>☁️ Sync Google</b> pada toolbar utama kapan saja untuk mensesuaikan data absensi ke Spreadsheet.</li>
+          </ol>
+        </div>
       </details>
     </div>
 
@@ -493,24 +517,35 @@ function getEmbeddedState() {
 }
 
 function loadState() {
+  let localState = null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const legacy = !raw ? (localStorage.getItem('absensiSiswa_v13') || localStorage.getItem('absensiSiswa_v12') || localStorage.getItem('absensiSiswa_v11') || localStorage.getItem('absensiSiswa_v10') || localStorage.getItem('absensiSiswa_v9') || localStorage.getItem('absensiSiswa_v8') || localStorage.getItem('absensiSiswa_v7') || localStorage.getItem('absensiSiswa_v6') || localStorage.getItem('absensiSiswa_v5')) : raw;
     if (legacy) {
       const parsed = JSON.parse(legacy);
       if (parsed && parsed.classes) {
-        return migrateState(parsed);
+        localState = migrateState(parsed);
       }
     }
   } catch(e) {}
 
   const embedded = getEmbeddedState();
   if (embedded && embedded.classes) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(embedded)); } catch(e) {}
-    return migrateState(embedded);
+    const migratedEmbedded = migrateState(embedded);
+    if (!localState) {
+      localState = migratedEmbedded;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(localState)); } catch(e) {}
+    } else {
+      const localTime = localState.updatedAt || 0;
+      const embeddedTime = migratedEmbedded.updatedAt || 0;
+      if (embeddedTime > localTime) {
+        localState = migratedEmbedded;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(localState)); } catch(e) {}
+      }
+    }
   }
 
-  return defaultState();
+  return localState || defaultState();
 }
 
 function migrateState(s) {
@@ -631,11 +666,15 @@ async function loadStateFromIDB() {
 }
 
 function saveState() {
+  state.updatedAt = Date.now();
   let localStorageSaved = false;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     localStorageSaved = true;
   } catch(e) {}
+
+  const embEl = document.getElementById('embedded-data');
+  if (embEl) embEl.textContent = JSON.stringify(state);
 
   saveStateToIDB(state);
 }
@@ -1748,6 +1787,14 @@ function saveSettings() {
 /* ===== DOWNLOAD HTML ===== */
 function downloadHTML() {
   try {
+    const settingsModal = document.getElementById('settingsModal');
+    if (settingsModal && settingsModal.classList.contains('show')) {
+      saveSettings();
+    }
+    if (document.getElementById('meetingMaterial')) {
+      updateMeetingData();
+    }
+    saveState();
     const clone = document.documentElement.cloneNode(true);
     const embEl = clone.querySelector('#embedded-data');
     if (embEl) embEl.textContent = JSON.stringify(state);
@@ -2033,6 +2080,32 @@ async function syncToGoogleSheets() {
 
 /* ===== EXCEL ===== */
 function importExcel() { document.getElementById('fileInput').click(); }
+function findOrCreateClassByName(rawClassName) {
+  const name = String(rawClassName || '').trim();
+  if (!name) return currentClass;
+  let idx = state.classes.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
+  if (idx >= 0) return idx;
+
+  const num = parseInt(name.replace(/[^0-9]/g, ''));
+  if (!isNaN(num) && num >= 1 && num <= state.classes.length) {
+    return num - 1;
+  }
+
+  const newClass = {
+    id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    name: name,
+    subject: (state.subjects && state.subjects[0]) || 'Informatika',
+    students: [],
+    attendance: {},
+    meetings: 0,
+    meetingsData: {},
+    startHour: 1,
+    endHour: 3
+  };
+  state.classes.push(newClass);
+  return state.classes.length - 1;
+}
+
 function handleFile(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -2040,42 +2113,63 @@ function handleFile(e) {
   reader.onload = ev => {
     try {
       const wb = XLSX.read(new Uint8Array(ev.target.result), { type:'array' });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:'' });
-      if (!rows.length) { toast('File kosong!', 'error'); return; }
-      const keys = Object.keys(rows[0]);
-      const nameKey = keys.find(k => /nama|name/i.test(k)) || keys[0];
-      const nisKey = keys.find(k => /^nis$|^nipd|^no/i.test(k)) || keys[1];
-      const classKey = keys.find(k => /kelas|class/i.test(k));
-      const grouped = {};
-      rows.forEach(r => {
-        let idx = currentClass;
-        if (classKey) {
-          const val = String(r[classKey]).trim();
-          const byName = state.classes.findIndex(c => c.name.toLowerCase() === val.toLowerCase());
-          if (byName >= 0) idx = byName;
-          else {
-            const num = parseInt(val.replace(/[^0-9]/g,''));
-            if (num >= 1 && num <= state.classes.length) idx = num-1;
+      if (!wb.SheetNames || wb.SheetNames.length === 0) {
+        toast('File excel tidak berisi sheet!', 'error');
+        return;
+      }
+
+      let totalStudentsImported = 0;
+      const affectedClassIndices = new Set();
+
+      wb.SheetNames.forEach(sheetName => {
+        const sheet = wb.Sheets[sheetName];
+        if (!sheet) return;
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+        if (!rows.length) return;
+
+        const keys = Object.keys(rows[0]);
+        const nameKey = keys.find(k => /nama|name/i.test(k)) || keys[0];
+        const nisKey = keys.find(k => /^nis$|^nipd|^no/i.test(k)) || keys[1];
+        const classKey = keys.find(k => /kelas|class|rombel/i.test(k));
+
+        rows.forEach(r => {
+          const nama = String(r[nameKey] || '').trim();
+          if (!nama || /^(no|nis|nama|kelas)$/i.test(nama)) return;
+
+          let targetClassIdx = currentClass;
+          if (classKey && String(r[classKey]).trim()) {
+            targetClassIdx = findOrCreateClassByName(String(r[classKey]).trim());
+          } else if (wb.SheetNames.length > 1 && !/sheet|template|info/i.test(sheetName)) {
+            targetClassIdx = findOrCreateClassByName(sheetName.trim());
           }
-        }
-        const nama = String(r[nameKey]).trim();
-        if (!nama) return;
-        if (!grouped[idx]) grouped[idx] = [];
-        grouped[idx].push({ name: nama, nis: nisKey ? String(r[nisKey]).trim() : '' });
-      });
-      let count = 0;
-      Object.keys(grouped).forEach(k => {
-        const c = state.classes[k];
-        grouped[k].forEach(s => {
-          const id = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-          c.students.push({ id, name:s.name, nis:s.nis });
-          c.attendance[id] = {};
-          for (let m=1; m<=c.meetings; m++) c.attendance[id][m] = 'H';
-          count++;
+
+          const targetClass = state.classes[targetClassIdx];
+          const nisVal = nisKey ? String(r[nisKey] || '').trim() : '';
+
+          const isDuplicate = targetClass.students.some(st =>
+            st.name.toLowerCase() === nama.toLowerCase() || (nisVal && st.nis === nisVal)
+          );
+
+          if (!isDuplicate) {
+            const id = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            targetClass.students.push({ id, name: nama, nis: nisVal });
+            targetClass.attendance[id] = {};
+            for (let m = 1; m <= targetClass.meetings; m++) {
+              targetClass.attendance[id][m] = 'H';
+            }
+            totalStudentsImported++;
+            affectedClassIndices.add(targetClassIdx);
+          }
         });
       });
+
+      if (totalStudentsImported === 0) {
+        toast('Tidak ada siswa baru yang ter-import (kosong / duplikat)', 'error');
+        return;
+      }
+
       render();
-      toast(`✅ ${count} siswa berhasil diimpor`);
+      toast(`✅ Berhasil mengimpor ${totalStudentsImported} siswa di ${affectedClassIndices.size} kelas!`);
     } catch(err) { toast('Gagal: ' + err.message, 'error'); }
   };
   reader.readAsArrayBuffer(file);
