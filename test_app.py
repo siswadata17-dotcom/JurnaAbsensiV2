@@ -21,9 +21,14 @@ def test_app():
         page.click("button:has-text('Test Spreadsheet')")
         assert page.is_visible("text=Masukkan Web App URL")
 
-        # Edit school name in settings
+        # Edit school name and max meetings in settings
         page.fill("#setSchoolName", "SMKN 1 TEST GONDANG")
+        page.fill("#setMaxMeetings", "40")
         page.click("button:has-text('Simpan Semua')")
+
+        # Verify badge header displays updated meeting limit
+        badge_text = page.inner_text("#headerBadge")
+        assert "40 Pertemuan" in badge_text, f"Expected 40 Pertemuan in badge, got: {badge_text}"
 
         # Take screenshot of settings / main view
         page.screenshot(path="screenshot_settings.png")

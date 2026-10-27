@@ -264,6 +264,10 @@
       <label>Tahun Ajaran</label>
       <input type="text" id="setAcademicYear" maxlength="20">
     </div>
+    <div class="form-group">
+      <label>Jumlah Maksimal Pertemuan</label>
+      <input type="number" id="setMaxMeetings" min="1" max="200" value="50">
+    </div>
 
     <div class="section-title">👨‍🏫 Identitas Guru</div>
     <div class="form-group">
@@ -533,7 +537,7 @@ Identitas sekolah, guru, daftar kelas, mapel, jadwal, dan pengaturan cetak TETAP
 <script>
 /* ===== KONFIGURASI ===== */
 const DEFAULT_CLASS_COUNT = 15;
-const MAX_MEETINGS = 50;
+const DEFAULT_MAX_MEETINGS = 50;
 const STORAGE_KEY = 'absensiSiswa_v14';
 const STATUS_CYCLE = ['H', 'S', 'I', 'A'];
 const DEFAULT_SUBJECTS = ['Informatika', 'PAI', 'PKK'];
@@ -600,6 +604,7 @@ function defaultState() {
     academicYear: '2026/2027',
     teacherName: '',
     nip: '',
+    maxMeetings: DEFAULT_MAX_MEETINGS,
     googleScriptUrl: '',
     subjects: [...DEFAULT_SUBJECTS],
     printSettings: { paperSize: 'A4', orientation: 'portrait' },
@@ -665,6 +670,8 @@ function migrateState(s) {
   if (!s.academicYear) s.academicYear = '2026/2027';
   if (!s.teacherName) s.teacherName = '';
   if (!s.nip) s.nip = '';
+  if (!s.maxMeetings || isNaN(Number(s.maxMeetings)) || Number(s.maxMeetings) < 1) s.maxMeetings = DEFAULT_MAX_MEETINGS;
+  else s.maxMeetings = Math.max(1, parseInt(s.maxMeetings));
   if (!s.googleScriptUrl) s.googleScriptUrl = '';
 
   if (!Array.isArray(s.subjects)) {
@@ -708,7 +715,8 @@ function migrateState(s) {
     if (!c.students) c.students = [];
     if (!c.attendance) c.attendance = {};
     if (!c.meetingsData) c.meetingsData = {};
-    c.meetings = Math.min(MAX_MEETINGS, Number(c.meetings) || 0);
+    const maxM = s.maxMeetings || DEFAULT_MAX_MEETINGS;
+    c.meetings = Math.min(maxM, Number(c.meetings) || 0);
     if (!c.subject || !s.subjects.includes(c.subject)) c.subject = s.subjects[0];
     if (!c.name) c.name = `Kelas ${i+1}`;
     if (!c.startHour) c.startHour = 1;
@@ -896,8 +904,9 @@ function renderHeader() {
   document.getElementById('headerTA').textContent = 'TA ' + state.academicYear;
   const teacher = state.teacherName || '-';
   const subject = state.classes[currentClass] ? state.classes[currentClass].subject || '-' : '-';
+  const maxM = state.maxMeetings || DEFAULT_MAX_MEETINGS;
   document.getElementById('headerTeacher').textContent = `‍🏫 Guru: ${teacher} | 📖 Mapel: ${subject}`;
-  document.getElementById('headerBadge').textContent = `${state.classes.length} Kelas • ${MAX_MEETINGS} Pertemuan`;
+  document.getElementById('headerBadge').textContent = `${state.classes.length} Kelas • ${maxM} Pertemuan`;
 }
 
 /* ===== RENDER ===== */
@@ -1836,6 +1845,7 @@ function openSettingsModal() {
   document.getElementById('setSchoolName').value = state.schoolName;
   document.getElementById('setSchoolAddress').value = state.schoolAddress || '';
   document.getElementById('setAcademicYear').value = state.academicYear;
+  document.getElementById('setMaxMeetings').value = state.maxMeetings || DEFAULT_MAX_MEETINGS;
   document.getElementById('setTeacherName').value = state.teacherName || '';
   document.getElementById('setNip').value = state.nip || '';
   document.getElementById('setGoogleScriptUrl').value = state.googleScriptUrl || '';
@@ -1864,6 +1874,7 @@ function saveSettings() {
   const name = document.getElementById('setSchoolName').value.trim();
   const addr = document.getElementById('setSchoolAddress').value.trim();
   const ta = document.getElementById('setAcademicYear').value.trim();
+  const maxMeetingsInput = parseInt(document.getElementById('setMaxMeetings').value, 10);
   const teacher = document.getElementById('setTeacherName').value.trim();
   const nip = document.getElementById('setNip').value.trim();
   const googleScriptUrl = document.getElementById('setGoogleScriptUrl').value.trim();
@@ -1872,6 +1883,7 @@ function saveSettings() {
 
   if (!name) { toast('Nama sekolah tidak boleh kosong!', 'error'); return; }
   if (!ta) { toast('Tahun ajaran tidak boleh kosong!', 'error'); return; }
+  if (isNaN(maxMeetingsInput) || maxMeetingsInput < 1) { toast('Jumlah maksimal pertemuan minimal 1!', 'error'); return; }
   if (tempClasses.length === 0) { toast('Minimal 1 kelas harus ada!', 'error'); return; }
   if (tempSubjects.length === 0) { toast('Minimal 1 mata pelajaran harus ada!', 'error'); return; }
   const err = validateSchedule();
@@ -1880,6 +1892,7 @@ function saveSettings() {
   state.schoolName = name;
   state.schoolAddress = addr;
   state.academicYear = ta;
+  state.maxMeetings = maxMeetingsInput;
   state.teacherName = teacher;
   state.nip = nip;
   state.googleScriptUrl = googleScriptUrl;
@@ -1958,6 +1971,7 @@ function resetData() {
       fresh.schoolName = state.schoolName;
       fresh.schoolAddress = state.schoolAddress;
       fresh.academicYear = state.academicYear;
+      fresh.maxMeetings = state.maxMeetings || DEFAULT_MAX_MEETINGS;
       fresh.teacherName = state.teacherName;
       fresh.nip = state.nip;
       fresh.subjects = [...state.subjects];
@@ -1982,6 +1996,7 @@ function resetTotal() {
       fresh.schoolName = state.schoolName;
       fresh.schoolAddress = state.schoolAddress;
       fresh.academicYear = state.academicYear;
+      fresh.maxMeetings = state.maxMeetings || DEFAULT_MAX_MEETINGS;
       fresh.teacherName = state.teacherName;
       fresh.nip = state.nip;
       fresh.subjects = [...state.subjects];
@@ -2090,7 +2105,8 @@ function deleteStudent(id) {
 }
 function addMeeting() {
   const c = state.classes[currentClass];
-  if (c.meetings >= MAX_MEETINGS) { toast(`Maksimal ${MAX_MEETINGS} pertemuan!`, 'error'); return; }
+  const maxM = state.maxMeetings || DEFAULT_MAX_MEETINGS;
+  if (c.meetings >= maxM) { toast(`Maksimal ${maxM} pertemuan!`, 'error'); return; }
   c.meetings++;
   currentMeeting = c.meetings;
   const startH = c.startHour || 1;
