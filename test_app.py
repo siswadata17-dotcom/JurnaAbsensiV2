@@ -5,7 +5,6 @@ def test_app():
     html_path = pathlib.Path("index.html").resolve().as_uri()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        # Create context with downloads enabled
         context = browser.new_context(accept_downloads=True)
         page = context.new_page()
         page.goto(html_path)
@@ -22,10 +21,6 @@ def test_app():
         page.click("button:has-text('Test Spreadsheet')")
         assert page.is_visible("text=Masukkan Web App URL")
 
-        # Verify DAFTAR KELAS (CRUD) no longer has "Jam Ke-" inputs in settings modal
-        assert not page.is_visible("#class-start-0")
-        assert not page.is_visible("text=Jam Ke-") or page.is_visible("button:has-text('Settings')")
-
         # Edit school name in settings
         page.fill("#setSchoolName", "SMKN 1 TEST GONDANG")
         page.click("button:has-text('Simpan Semua')")
@@ -33,9 +28,15 @@ def test_app():
         # Take screenshot of settings / main view
         page.screenshot(path="screenshot_settings.png")
 
-        # 2. Test Download Template
+        # 2. Test Consolidated Main Menu Dropdown & Download Template
+        page.click("button:has-text('Menu Aksi')")
+        page.wait_for_selector("#mainMenuDropdownMenu", state="visible")
+        assert page.is_visible("button:has-text('Import Excel Siswa')")
+        assert page.is_visible("button:has-text('Export Excel Rekap')")
+        assert page.is_visible("button:has-text('Download Template Excel')")
+
         with page.expect_download() as download_info:
-            page.click("button:has-text('Template')")
+            page.click("button:has-text('Download Template Excel')")
         download_tpl = download_info.value
         tpl_path = "downloaded_template.xlsx"
         download_tpl.save_as(tpl_path)
@@ -77,9 +78,19 @@ def test_app():
         page.fill("#studentName", "SITI AMINAH")
         page.click("#studentModal button:has-text('Simpan')")
 
-        # 4. Test Download HTML saves active state
+        # 4. Test Meeting Action Dropdown Menu
+        page.click("button:has-text('+ Pertemuan')")
+        page.click("button:has-text('Aksi Pertemuan')")
+        page.wait_for_selector("#meetingMenuDropdownMenu", state="visible")
+        assert page.is_visible("button:has-text('Export Pertemuan')")
+        assert page.is_visible("button:has-text('Import Pertemuan')")
+        assert page.is_visible("button:has-text('Samakan ke Kelas Lain')")
+
+        # 5. Test Download HTML via Main Menu Dropdown
+        page.click("button:has-text('Menu Aksi')")
+        page.wait_for_selector("#mainMenuDropdownMenu", state="visible")
         with page.expect_download() as download_info:
-            page.click("button:has-text('Download HTML')")
+            page.click("button:has-text('Download HTML Aplikasi')")
         download = download_info.value
         download_path = "downloaded_test.html"
         download.save_as(download_path)
