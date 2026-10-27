@@ -43,7 +43,9 @@ def test_app():
         assert pathlib.Path(tpl_path).exists()
 
         # 3. Test Student CRUD Functionality
-        # Add new student
+        # Add new student via Menu Aksi
+        page.click("button:has-text('Menu Aksi')")
+        page.wait_for_selector("#mainMenuDropdownMenu", state="visible")
         page.click("button:has-text('Tambah Siswa')")
         page.wait_for_selector("#studentModal", state="visible")
         page.fill("#studentNis", "99-001")
@@ -72,6 +74,8 @@ def test_app():
         assert not page.is_visible("td:has-text('BUDI SANTOSO EDIT')")
 
         # Add a student to stay saved for download test
+        page.click("button:has-text('Menu Aksi')")
+        page.wait_for_selector("#mainMenuDropdownMenu", state="visible")
         page.click("button:has-text('Tambah Siswa')")
         page.wait_for_selector("#studentModal", state="visible")
         page.fill("#studentNis", "99-002")

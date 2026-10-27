@@ -125,10 +125,24 @@
   .toast { position: fixed; top: 15px; right: 15px; background: #10b981; color: #fff; padding: 10px 16px; border-radius: 4px; font-size: 13px; z-index: 300; opacity: 0; transition: opacity .3s; }
   .toast.show { opacity: 1; }
   @media (max-width: 640px) {
+    body { font-size: 13px; }
     .toolbar, .info-bar, .meeting-form, .table-wrap { padding: 10px; }
-    .nav-group { margin-left: 0; }
-    header { flex-direction: column; align-items: flex-start; }
+    .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .toolbar-left { flex-direction: row; flex-wrap: wrap; width: 100%; justify-content: flex-start; gap: 8px; }
+    .toolbar-left .btn-dark, .toolbar-left .dropdown, .toolbar-left button { flex: 1 1 auto; }
+    .separator { display: none; }
+    .class-subject-panel { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+    .class-subject-panel .control-row { flex: 1 1 calc(50% - 8px); min-width: 130px; }
+    .class-subject-panel select { width: 100%; }
+    .nav-group { width: 100%; justify-content: space-between; margin-left: 0; }
+    header { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 15px; }
+    .school-info h1 { font-size: 16px; }
+    .school-badge { align-self: flex-start; }
+    .info-bar { flex-direction: row; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .form-row { flex-direction: column; gap: 8px; }
+    .form-row > div { width: 100%; }
     .print-settings { grid-template-columns: 1fr; }
+    .modal { padding: 15px; width: 98%; }
   }
 
   /* Dropdown Styling */
@@ -165,6 +179,9 @@
       <div class="dropdown" id="mainMenuDropdown">
         <button class="btn-blue" onclick="toggleDropdown('mainMenuDropdownMenu')">⚡ Menu Aksi ▾</button>
         <div class="dropdown-menu" id="mainMenuDropdownMenu">
+          <div class="dropdown-header">👤 Kelola Siswa</div>
+          <button class="dropdown-item" onclick="openAddStudentModal(); closeAllDropdowns();">➕ Tambah Siswa</button>
+          <div class="dropdown-divider"></div>
           <div class="dropdown-header">📥 Import / Export Data</div>
           <button class="dropdown-item" onclick="importExcel(); closeAllDropdowns();">📥 Import Excel Siswa</button>
           <button class="dropdown-item" onclick="exportExcel(); closeAllDropdowns();"> Export Excel Rekap</button>
@@ -179,6 +196,16 @@
           <button class="dropdown-item" onclick="downloadHTML(); closeAllDropdowns();"> Download HTML Aplikasi</button>
           <button class="dropdown-item text-red" onclick="resetData(); closeAllDropdowns();">🧹 Reset Data Siswa & Absensi</button>
           <button class="dropdown-item text-red" onclick="resetTotal(); closeAllDropdowns();">🗑 Reset Total Aplikasi</button>
+        </div>
+      </div>
+      <!-- Meeting Action Dropdown Menu -->
+      <div class="dropdown" id="meetingMenuDropdown">
+        <button class="btn-purple" onclick="toggleDropdown('meetingMenuDropdownMenu')">⚡ Aksi Pertemuan ▾</button>
+        <div class="dropdown-menu" id="meetingMenuDropdownMenu">
+          <button class="dropdown-item" onclick="exportMeetingFile(); closeAllDropdowns();">📤 Export Pertemuan (JSON)</button>
+          <button class="dropdown-item" onclick="importMeetingFile(); closeAllDropdowns();">📥 Import Pertemuan (JSON)</button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" onclick="openSyncMeetingModal(); closeAllDropdowns();">👯 Samakan ke Kelas Lain</button>
         </div>
       </div>
     </div>
@@ -202,16 +229,6 @@
       <span id="meetingLabel" style="font-weight:bold; padding:0 5px;">Pertemuan 1</span>
       <button class="btn-gray" onclick="nextMeeting()">▶</button>
       <button class="btn-blue" onclick="addMeeting()">+ Pertemuan</button>
-      <!-- Meeting Action Dropdown Menu -->
-      <div class="dropdown" id="meetingMenuDropdown">
-        <button class="btn-purple" onclick="toggleDropdown('meetingMenuDropdownMenu')">⚡ Aksi Pertemuan ▾</button>
-        <div class="dropdown-menu dropdown-menu-right" id="meetingMenuDropdownMenu">
-          <button class="dropdown-item" onclick="exportMeetingFile(); closeAllDropdowns();">📤 Export Pertemuan (JSON)</button>
-          <button class="dropdown-item" onclick="importMeetingFile(); closeAllDropdowns();">📥 Import Pertemuan (JSON)</button>
-          <div class="dropdown-divider"></div>
-          <button class="dropdown-item" onclick="openSyncMeetingModal(); closeAllDropdowns();">👯 Samakan ke Kelas Lain</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -2056,6 +2073,7 @@ function saveStudent() {
 function cycleStatus(id) {
   const c = state.classes[currentClass];
   if (c.meetings === 0) return;
+  if (!c.attendance[id]) c.attendance[id] = {};
   const cur = c.attendance[id][currentMeeting] || 'H';
   c.attendance[id][currentMeeting] = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur)+1) % STATUS_CYCLE.length];
   render();
@@ -2566,6 +2584,7 @@ function autoSelectTodayClass(isManualTrigger = false) {
   if (foundIdx >= 0) {
     const classChanged = currentClass !== foundIdx;
     currentClass = foundIdx;
+    currentMeeting = Math.max(1, state.classes[currentClass].meetings || 1);
     const targetCls = state.classes[currentClass];
     if (match.subject && state.subjects.includes(match.subject)) {
       targetCls.subject = match.subject;
