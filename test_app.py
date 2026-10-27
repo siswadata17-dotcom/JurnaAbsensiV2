@@ -41,18 +41,55 @@ def test_app():
         download_tpl.save_as(tpl_path)
         assert pathlib.Path(tpl_path).exists()
 
-        # 3. Test Download HTML saves active state
+        # 3. Test Student CRUD Functionality
+        # Add new student
+        page.click("button:has-text('Tambah Siswa')")
+        page.wait_for_selector("#studentModal", state="visible")
+        page.fill("#studentNis", "99-001")
+        page.fill("#studentName", "BUDI SANTOSO")
+        page.click("#studentModal button:has-text('Simpan')")
+
+        # Verify student is in table
+        assert page.is_visible("td:has-text('BUDI SANTOSO')")
+        assert page.is_visible("td:has-text('99-001')")
+
+        # Edit student details
+        page.click("tr:has-text('BUDI SANTOSO') button:has-text('Edit')")
+        page.wait_for_selector("#studentModal", state="visible")
+        page.fill("#studentName", "BUDI SANTOSO EDIT")
+        page.click("#studentModal button:has-text('Simpan')")
+
+        # Verify edited student in table
+        assert page.is_visible("td:has-text('BUDI SANTOSO EDIT')")
+
+        # Delete student
+        page.click("tr:has-text('BUDI SANTOSO EDIT') button:has-text('Hapus')")
+        page.wait_for_selector("#modal", state="visible")
+        page.click("#modalOk")
+
+        # Verify student removed
+        assert not page.is_visible("td:has-text('BUDI SANTOSO EDIT')")
+
+        # Add a student to stay saved for download test
+        page.click("button:has-text('Tambah Siswa')")
+        page.wait_for_selector("#studentModal", state="visible")
+        page.fill("#studentNis", "99-002")
+        page.fill("#studentName", "SITI AMINAH")
+        page.click("#studentModal button:has-text('Simpan')")
+
+        # 4. Test Download HTML saves active state
         with page.expect_download() as download_info:
             page.click("button:has-text('Download HTML')")
         download = download_info.value
         download_path = "downloaded_test.html"
         download.save_as(download_path)
 
-        # Load the downloaded file and check if "SMKN 1 TEST GONDANG" is preserved
+        # Load the downloaded file and check if "SMKN 1 TEST GONDANG" and "SITI AMINAH" are preserved
         page_downloaded = context.new_page()
         page_downloaded.goto(pathlib.Path(download_path).resolve().as_uri())
         header_text = page_downloaded.inner_text("#headerSchool")
         assert "SMKN 1 TEST GONDANG" in header_text, f"Expected SMKN 1 TEST GONDANG in {header_text}"
+        assert page_downloaded.is_visible("td:has-text('SITI AMINAH')")
 
         page_downloaded.screenshot(path="screenshot_app.png")
         browser.close()
