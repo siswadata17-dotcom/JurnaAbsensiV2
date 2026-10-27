@@ -126,6 +126,19 @@
     header { flex-direction: column; align-items: flex-start; }
     .print-settings { grid-template-columns: 1fr; }
   }
+
+  /* Dropdown Styling */
+  .dropdown { position: relative; display: inline-block; }
+  .dropdown-menu { display: none; position: absolute; top: 100%; left: 0; min-width: 210px; background-color: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1); z-index: 1000; padding: 6px 0; margin-top: 4px; text-align: left; }
+  .dropdown-menu.dropdown-menu-right { left: auto; right: 0; }
+  .dropdown-menu.show { display: block; }
+  .dropdown-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 14px; color: #374151; text-align: left; background: none; border: none; font-size: 13px; font-weight: normal; border-radius: 0; cursor: pointer; white-space: nowrap; line-height: 1.4; }
+  .dropdown-item:hover { background-color: #f1f5f9; color: #1e293b; opacity: 1; }
+  .dropdown-item.text-red { color: #dc2626; }
+  .dropdown-item.text-red:hover { background-color: #fef2f2; color: #991b1b; }
+  .dropdown-header { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #64748b; padding: 6px 14px 2px; letter-spacing: 0.5px; }
+  .dropdown-divider { height: 1px; margin: 4px 0; background-color: #e2e8f0; overflow: hidden; }
+
 </style>
 </head>
 <body>
@@ -149,18 +162,28 @@
     <label>Mapel:</label>
     <select id="subjectSelect" onchange="changeClassSubject(this.value)"><option value="Informatika">Informatika</option><option value="Pendidikan Agama Islam">Pendidikan Agama Islam</option><option value="Produk Kreatif dan Kewirausahaan">Produk Kreatif dan Kewirausahaan</option></select>
     <div class="separator"></div>
-    <button class="btn-blue" onclick="importExcel()">📥 Import</button>
-    <button class="btn-green" onclick="exportExcel()"> Export</button>
-    <button onclick="downloadTemplate()">📋 Template</button>
-    <button class="btn-orange" onclick="syncToGoogleSheets()">☁️ Sync Google</button>
-    <div class="separator"></div>
-    <button class="btn-cyan" onclick="printRekap(currentClass)">🖨️ Cetak</button>
-    <button class="btn-cyan" onclick="printAllRekap()">🖨️ Semua</button>
-    <div class="separator"></div>
-    <button class="btn-purple" onclick="downloadHTML()"> Download HTML</button>
-    <div class="separator"></div>
-    <button class="btn-red" onclick="resetData()">🧹 Reset Data</button>
-    <button class="btn-outline" onclick="resetTotal()">🗑 Reset Total</button>
+
+    <!-- Consolidated Action Menu Dropdown -->
+    <div class="dropdown" id="mainMenuDropdown">
+      <button class="btn-blue" onclick="toggleDropdown('mainMenuDropdownMenu')">⚡ Menu Aksi ▾</button>
+      <div class="dropdown-menu" id="mainMenuDropdownMenu">
+        <div class="dropdown-header">📥 Import / Export Data</div>
+        <button class="dropdown-item" onclick="importExcel(); closeAllDropdowns();">📥 Import Excel Siswa</button>
+        <button class="dropdown-item" onclick="exportExcel(); closeAllDropdowns();"> Export Excel Rekap</button>
+        <button class="dropdown-item" onclick="downloadTemplate(); closeAllDropdowns();">📋 Download Template Excel</button>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-header">🖨️ Cetak & Sinkronisasi</div>
+        <button class="dropdown-item" onclick="printRekap(currentClass); closeAllDropdowns();">🖨️ Cetak Rekap Kelas Ini</button>
+        <button class="dropdown-item" onclick="printAllRekap(); closeAllDropdowns();">🖨️ Cetak Semua Kelas</button>
+        <button class="dropdown-item" onclick="syncToGoogleSheets(); closeAllDropdowns();">☁️ Sync Google Sheets</button>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-header">💾 Backup & Reset</div>
+        <button class="dropdown-item" onclick="downloadHTML(); closeAllDropdowns();"> Download HTML Aplikasi</button>
+        <button class="dropdown-item text-red" onclick="resetData(); closeAllDropdowns();">🧹 Reset Data Siswa & Absensi</button>
+        <button class="dropdown-item text-red" onclick="resetTotal(); closeAllDropdowns();">🗑 Reset Total Aplikasi</button>
+      </div>
+    </div>
+
     <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFile(event)">
     <div class="nav-group">
       <button class="btn-gray" onclick="prevMeeting()">◀</button>
@@ -737,9 +760,17 @@ const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 
 function parseLocalDate(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return null;
-  const parts = dateStr.split('-').map(Number);
+  const parts = dateStr.trim().split(/[\/\-]/).map(Number);
   if (parts.length === 3 && !parts.some(isNaN)) {
-    return new Date(parts[0], parts[1] - 1, parts[2]);
+    let year, month, day;
+    if (parts[0] > 31) { // YYYY-MM-DD or YYYY/MM/DD
+      year = parts[0]; month = parts[1] - 1; day = parts[2];
+    } else if (parts[2] > 31) { // DD/MM/YYYY or DD-MM-YYYY
+      day = parts[0]; month = parts[1] - 1; year = parts[2];
+    } else {
+      year = parts[0]; month = parts[1] - 1; day = parts[2];
+    }
+    return new Date(year, month, day);
   }
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? null : d;
@@ -960,10 +991,14 @@ function renderMeetingForm() {
       <div style="font-size:11px; color:#6b7280;">
         📅 Hari: <b>${dayName}</b> • Mapel: <b>${esc(c.subject)}</b> • 🏫 Kelas: <b>${esc(c.name)}</b>
       </div>
-      <div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button class="btn-purple" style="padding:4px 8px; font-size:12px;" onclick="exportMeetingFile()">📤 Export Pertemuan</button>
-        <button class="btn-blue" style="padding:4px 8px; font-size:12px;" onclick="importMeetingFile()">📥 Import Pertemuan</button>
-        <button class="btn-orange" style="padding:4px 8px; font-size:12px;" onclick="openSyncMeetingModal()">👯 Samakan ke Kelas Lain</button>
+      <div class="dropdown" id="meetingMenuDropdown">
+        <button class="btn-purple" style="padding:4px 10px; font-size:12px;" onclick="toggleDropdown('meetingMenuDropdownMenu')">⚡ Aksi Pertemuan ▾</button>
+        <div class="dropdown-menu dropdown-menu-right" id="meetingMenuDropdownMenu">
+          <button class="dropdown-item" onclick="exportMeetingFile(); closeAllDropdowns();">📤 Export Pertemuan (JSON)</button>
+          <button class="dropdown-item" onclick="importMeetingFile(); closeAllDropdowns();">📥 Import Pertemuan (JSON)</button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" onclick="openSyncMeetingModal(); closeAllDropdowns();">👯 Samakan ke Kelas Lain</button>
+        </div>
       </div>
     </div>`;
 }
@@ -1299,7 +1334,13 @@ function saveEditClass(idx) {
     toast(`Nama kelas "${newName}" sudah ada!`, 'error'); return;
   }
   tempClasses[idx].name = newName;
+  if (tempTeacherSchedule && tempTeacherSchedule.length > 0) {
+    tempTeacherSchedule.forEach(ts => {
+      if (ts.className === oldName) ts.className = newName;
+    });
+  }
   renderClassList();
+  renderTeacherScheduleList();
   toast(`✅ "${oldName}" diperbarui`);
 }
 
@@ -1352,7 +1393,11 @@ function removeClass(idx) {
 
   showConfirm('🗑 Hapus Kelas', warnMsg + '\n\nTindakan ini tidak bisa dibatalkan.', () => {
     const wasActive = idx === currentClass;
+    const removedName = cls.name;
     tempClasses.splice(idx, 1);
+    if (tempTeacherSchedule && tempTeacherSchedule.length > 0) {
+      tempTeacherSchedule = tempTeacherSchedule.filter(ts => ts.className !== removedName);
+    }
     if (wasActive) {
       currentClass = 0;
       currentMeeting = 1;
@@ -1360,7 +1405,8 @@ function removeClass(idx) {
       currentClass--;
     }
     renderClassList();
-    toast(`✅ Kelas "${cls.name}" dihapus`);
+    renderTeacherScheduleList();
+    toast(`✅ Kelas "${removedName}" dihapus`);
   }, false);
 }
 
@@ -2118,13 +2164,9 @@ function buildRekapHTML(c) {
     const scEnd = schedForM.find(x => x.hour === endH) || scStart;
 
     let waktu = '-';
-    if (scStart && scEnd) {
+    if (scStart) {
       const startTimeFormatted = scStart.start.replace(':', '.');
-      const endTimeFormatted = scEnd.end.replace(':', '.');
-      waktu = `${startTimeFormatted} - ${endTimeFormatted}`;
-    } else if (scStart) {
-      const startTimeFormatted = scStart.start.replace(':', '.');
-      const endTimeFormatted = scStart.end.replace(':', '.');
+      const endTimeFormatted = scEnd ? scEnd.end.replace(':', '.') : scStart.end.replace(':', '.');
       waktu = `${startTimeFormatted} - ${endTimeFormatted}`;
     }
 
@@ -2284,6 +2326,9 @@ function importExcel() { document.getElementById('fileInput').click(); }
 function findOrCreateClassByName(rawClassName) {
   const name = String(rawClassName || '').trim();
   if (!name) return currentClass;
+  if (/^sheet\d*$/i.test(name) || /^info/i.test(name) || /materi$/i.test(name) || /^template/i.test(name)) {
+    return currentClass;
+  }
   let idx = state.classes.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
   if (idx >= 0) return idx;
 
@@ -2519,7 +2564,7 @@ function autoSelectTodayClass(isManualTrigger = false) {
     if (targetCls.meetings > 0 && targetCls.meetingsData) {
       if (!targetCls.meetingsData[currentMeeting]) {
         targetCls.meetingsData[currentMeeting] = { date: getLocalDateString(), hour: targetHour, material: '' };
-      } else {
+      } else if (!targetCls.meetingsData[currentMeeting].hour) {
         targetCls.meetingsData[currentMeeting].hour = targetHour;
       }
     }
@@ -2533,6 +2578,28 @@ function autoSelectTodayClass(isManualTrigger = false) {
     toast(`⚠️ Kelas ${match.className} tidak ditemukan di daftar kelas.`, 'error');
   }
 }
+
+
+/* ===== DROPDOWN MENU UTILS ===== */
+function toggleDropdown(menuId) {
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+  const isShow = menu.classList.contains('show');
+  closeAllDropdowns();
+  if (!isShow) {
+    menu.classList.add('show');
+  }
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dropdown')) {
+    closeAllDropdowns();
+  }
+});
 
 /* ===== INIT ===== */
 startClock();
