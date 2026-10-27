@@ -302,6 +302,28 @@
       </div>
     </div>
 
+    <div class="section-title">📅 Jadwal Ngajar Saya (CRUD)</div>
+    <p style="font-size:11px; color:#666; margin-bottom:8px;">
+      Kelola jadwal mengajar Anda per hari (misal: Senin ngajar X DKV 1 jam 1 - 3, Selasa ngajar X DKV 2 jam 7 - 9).
+    </p>
+    <div id="teacherScheduleListContainer"></div>
+    <div class="teacher-schedule-add" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; align-items:center;">
+      <select id="newTSDay" style="width:110px;">
+        <option value="Senin">Senin</option>
+        <option value="Selasa">Selasa</option>
+        <option value="Rabu">Rabu</option>
+        <option value="Kamis">Kamis</option>
+        <option value="Jumat">Jumat</option>
+        <option value="Sabtu">Sabtu</option>
+      </select>
+      <select id="newTSClass" style="flex:1; min-width:110px;"></select>
+      <span style="font-size:12px;">Jam</span>
+      <input type="number" id="newTSStart" value="1" min="1" max="20" style="width:55px; text-align:center;" placeholder="Mulai">
+      <span style="font-size:12px;">s/d</span>
+      <input type="number" id="newTSEnd" value="3" min="1" max="20" style="width:55px; text-align:center;" placeholder="Selesai">
+      <button class="btn-green" onclick="addTeacherSchedule()">➕ Tambah Jadwal</button>
+    </div>
+
     <div class="section-title">🕐 Jadwal Pelajaran per Hari</div>
     <p style="font-size:11px; color:#666; margin-bottom:8px;">
       Edit jadwal untuk 3 kategori hari. Section <b style="background:#10b981;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;">HARI INI</b> adalah jadwal aktif.
@@ -423,6 +445,7 @@ let clockInterval = null;
 let tempSchedule = { senin: [], selasa_kamis: [], jumat: [] };
 let tempSubjects = [];
 let tempClasses = [];
+let tempTeacherSchedule = [];
 
 function defaultState() {
   const classes = [];
@@ -451,6 +474,10 @@ function defaultState() {
       selasa_kamis: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SELASA_KAMIS)),
       jumat: JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_JUMAT))
     },
+    teacherSchedule: [
+      { id: 'ts_1', day: 'Senin', className: 'X DKV 1', startHour: 1, endHour: 3, subject: 'Informatika' },
+      { id: 'ts_2', day: 'Selasa', className: 'X DKV 2', startHour: 7, endHour: 9, subject: 'Informatika' }
+    ],
     classes
   };
 }
@@ -512,6 +539,13 @@ function migrateState(s) {
     if (!Array.isArray(s.schedule.senin)) s.schedule.senin = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SENIN));
     if (!Array.isArray(s.schedule.selasa_kamis)) s.schedule.selasa_kamis = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_SELASA_KAMIS));
     if (!Array.isArray(s.schedule.jumat)) s.schedule.jumat = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_JUMAT));
+  }
+
+  if (!Array.isArray(s.teacherSchedule)) {
+    s.teacherSchedule = [
+      { id: 'ts_1', day: 'Senin', className: 'X DKV 1', startHour: 1, endHour: 3, subject: 'Informatika' },
+      { id: 'ts_2', day: 'Selasa', className: 'X DKV 2', startHour: 7, endHour: 9, subject: 'Informatika' }
+    ];
   }
 
   s.classes.forEach((c, i) => {
@@ -1423,6 +1457,163 @@ function validateSchedule() {
   return null;
 }
 
+/* ===== CRUD JADWAL NGAJAR SAYA ===== */
+function renderTeacherScheduleList() {
+  const container = document.getElementById('teacherScheduleListContainer');
+  const classSelect = document.getElementById('newTSClass');
+
+  if (classSelect) {
+    classSelect.innerHTML = '';
+    tempClasses.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = `${c.name} (${c.subject || '-'})`;
+      classSelect.appendChild(opt);
+    });
+  }
+
+  if (!tempTeacherSchedule || tempTeacherSchedule.length === 0) {
+    container.innerHTML = '<div style="padding:10px; color:#888; text-align:center; font-size:12px; border:1px dashed #ccc; border-radius:4px;">Belum ada jadwal mengajar. Silakan tambahkan di bawah.</div>';
+    return;
+  }
+
+  let html = `<div style="border:1px solid #e5e7eb; border-radius:6px; overflow-x:auto;">
+    <table class="schedule-edit" style="width:100%;">
+      <thead>
+        <tr>
+          <th style="width:70px;">Hari</th>
+          <th>Kelas</th>
+          <th style="width:100px;">Jam Ke-</th>
+          <th>Mata Pelajaran</th>
+          <th style="width:80px;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  tempTeacherSchedule.forEach((item, idx) => {
+    html += `<tr id="ts-item-${idx}">
+      <td><b>${esc(item.day)}</b></td>
+      <td>${esc(item.className)}</td>
+      <td>Jam Ke-${item.startHour} - ${item.endHour}</td>
+      <td>${esc(item.subject || '-')}</td>
+      <td>
+        <button class="btn-blue" style="font-size:10px; padding:2px 6px;" onclick="startEditTeacherSchedule(${idx})">✏️</button>
+        <button class="btn-del" style="font-size:10px; padding:2px 6px;" onclick="removeTeacherSchedule(${idx})">🗑</button>
+      </td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+function startEditTeacherSchedule(idx) {
+  const item = tempTeacherSchedule[idx];
+  const tr = document.getElementById(`ts-item-${idx}`);
+  if (!tr) return;
+
+  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  let dayOpts = days.map(d => `<option value="${d}" ${d === item.day ? 'selected' : ''}>${d}</option>`).join('');
+
+  let classOpts = tempClasses.map(c => `<option value="${esc(c.name)}" ${c.name === item.className ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+
+  tr.innerHTML = `
+    <td><select id="ts-edit-day-${idx}" style="font-size:11px; padding:2px;">${dayOpts}</select></td>
+    <td><select id="ts-edit-class-${idx}" style="font-size:11px; padding:2px;">${classOpts}</select></td>
+    <td>
+      <div style="display:flex; gap:2px; align-items:center; justify-content:center;">
+        <input type="number" id="ts-edit-start-${idx}" value="${item.startHour}" min="1" max="20" style="width:35px; font-size:11px;">
+        <span>-</span>
+        <input type="number" id="ts-edit-end-${idx}" value="${item.endHour}" min="1" max="20" style="width:35px; font-size:11px;">
+      </div>
+    </td>
+    <td><span style="font-size:11px; color:#555;">(Sesuai Kelas)</span></td>
+    <td>
+      <button class="btn-green" style="font-size:10px; padding:2px 5px;" onclick="saveEditTeacherSchedule(${idx})">💾</button>
+      <button class="btn-gray" style="font-size:10px; padding:2px 5px;" onclick="renderTeacherScheduleList()">✖</button>
+    </td>
+  `;
+}
+
+function saveEditTeacherSchedule(idx) {
+  const day = document.getElementById(`ts-edit-day-${idx}`).value;
+  const className = document.getElementById(`ts-edit-class-${idx}`).value;
+  const sH = Math.max(1, parseInt(document.getElementById(`ts-edit-start-${idx}`).value) || 1);
+  const eH = Math.max(sH, parseInt(document.getElementById(`ts-edit-end-${idx}`).value) || sH);
+
+  const matchedClass = tempClasses.find(c => c.name === className);
+  const subject = matchedClass ? matchedClass.subject : '';
+
+  tempTeacherSchedule[idx] = {
+    id: tempTeacherSchedule[idx].id || ('ts_' + Date.now()),
+    day,
+    className,
+    startHour: sH,
+    endHour: eH,
+    subject
+  };
+
+  if (matchedClass) {
+    matchedClass.startHour = sH;
+    matchedClass.endHour = eH;
+  }
+
+  renderTeacherScheduleList();
+  toast(`✅ Jadwal ${day} (${className}) diperbarui!`);
+}
+
+function addTeacherSchedule() {
+  const day = document.getElementById('newTSDay').value;
+  const className = document.getElementById('newTSClass').value;
+  const sH = Math.max(1, parseInt(document.getElementById('newTSStart').value) || 1);
+  const eH = Math.max(sH, parseInt(document.getElementById('newTSEnd').value) || sH);
+
+  if (!className) {
+    toast('Pilih kelas terlebih dahulu!', 'error');
+    return;
+  }
+
+  const matchedClass = tempClasses.find(c => c.name === className);
+  const subject = matchedClass ? matchedClass.subject : '';
+
+  tempTeacherSchedule.push({
+    id: 'ts_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    day,
+    className,
+    startHour: sH,
+    endHour: eH,
+    subject
+  });
+
+  if (matchedClass) {
+    matchedClass.startHour = sH;
+    matchedClass.endHour = eH;
+  }
+
+  renderTeacherScheduleList();
+  toast(`✅ Jadwal baru ${day} - ${className} (Jam ${sH}-${eH}) ditambahkan!`);
+}
+
+function removeTeacherSchedule(idx) {
+  const item = tempTeacherSchedule[idx];
+  showConfirm('🗑 Hapus Jadwal Ngajar', `Hapus jadwal mengajar ${item.day} - ${item.className}?`, () => {
+    tempTeacherSchedule.splice(idx, 1);
+    renderTeacherScheduleList();
+    toast('✅ Jadwal mengajar dihapus');
+  }, false);
+}
+
+function syncTeacherScheduleToClasses() {
+  tempTeacherSchedule.forEach(ts => {
+    const cls = tempClasses.find(c => c.name === ts.className);
+    if (cls) {
+      cls.startHour = ts.startHour;
+      cls.endHour = ts.endHour;
+      if (cls.subject) ts.subject = cls.subject;
+    }
+  });
+}
+
 function openSettingsModal() {
   document.getElementById('setSchoolName').value = state.schoolName;
   document.getElementById('setSchoolAddress').value = state.schoolAddress || '';
@@ -1436,6 +1627,7 @@ function openSettingsModal() {
   });
   tempClasses = JSON.parse(JSON.stringify(state.classes));
   tempSubjects = [...state.subjects];
+  tempTeacherSchedule = JSON.parse(JSON.stringify(state.teacherSchedule || []));
   tempSchedule = {
     senin: JSON.parse(JSON.stringify(state.schedule.senin)),
     selasa_kamis: JSON.parse(JSON.stringify(state.schedule.selasa_kamis)),
@@ -1443,6 +1635,7 @@ function openSettingsModal() {
   };
   renderClassList();
   renderSubjectList();
+  renderTeacherScheduleList();
   renderScheduleEditContainer();
   document.getElementById('settingsModal').classList.add('show');
   setTimeout(() => document.getElementById('setSchoolName').focus(), 80);
@@ -1472,8 +1665,10 @@ function saveSettings() {
   state.teacherName = teacher;
   state.nip = nip;
   state.googleScriptUrl = googleScriptUrl;
+  syncTeacherScheduleToClasses();
   state.classes = tempClasses;
   state.subjects = [...tempSubjects];
+  state.teacherSchedule = tempTeacherSchedule;
   state.printSettings = { paperSize, orientation };
   state.schedule = {
     senin: tempSchedule.senin.slice().sort((a,b) => a.hour - b.hour),
@@ -1683,11 +1878,33 @@ function buildRekapHTML(c) {
       if (dt) hariTgl = DAY_NAMES[dt.getDay()] + ', ' + dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
     }
     const schedForM = getScheduleForDate(d.date);
-    const sc = schedForM.find(x => x.hour === d.hour);
-    const waktu = sc ? `${sc.start} - ${sc.end}` : '-';
+
+    let startH = c.startHour || 1;
+    let endH = c.endHour || (startH + 2);
+    if (d.hour) {
+      startH = d.hour;
+      endH = Math.max(startH, c.endHour ? (d.hour + (c.endHour - (c.startHour || 1))) : startH);
+    }
+
+    let jamKeStr = (startH === endH) ? `${startH}` : `${startH} - ${endH}`;
+
+    const scStart = schedForM.find(x => x.hour === startH);
+    const scEnd = schedForM.find(x => x.hour === endH) || scStart;
+
+    let waktu = '-';
+    if (scStart && scEnd) {
+      const startTimeFormatted = scStart.start.replace(':', '.');
+      const endTimeFormatted = scEnd.end.replace(':', '.');
+      waktu = `${startTimeFormatted} - ${endTimeFormatted}`;
+    } else if (scStart) {
+      const startTimeFormatted = scStart.start.replace(':', '.');
+      const endTimeFormatted = scStart.end.replace(':', '.');
+      waktu = `${startTimeFormatted} - ${endTimeFormatted}`;
+    }
+
     html += `<tr><td style="text-align:center;">${m}</td>
       <td>${hariTgl}</td>
-      <td style="text-align:center;">${d.hour||'-'}</td>
+      <td style="text-align:center;">${jamKeStr}</td>
       <td style="text-align:center;">${waktu}</td>
       <td>${esc(d.material||'-')}</td></tr>`;
   }
