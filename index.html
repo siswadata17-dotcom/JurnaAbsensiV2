@@ -956,8 +956,7 @@ function renderInfo() {
   const bar = document.getElementById('infoBar');
   if (c.meetings === 0) {
     bar.innerHTML = `<span>👥 Siswa: <b>${c.students.length}</b></span>
-      <span>📅 Belum ada pertemuan — klik <b>+ Pertemuan</b></span>
-      <button class="btn-green" style="padding:2px 8px; font-size:12px; margin-left:auto;" onclick="openAddStudentModal()">➕ Tambah Siswa</button>`;
+      <span>📅 Belum ada pertemuan — klik <b>+ Pertemuan</b></span>`;
     return;
   }
   let h=0,s=0,i=0,a=0;
@@ -971,8 +970,7 @@ function renderInfo() {
     <span class="status-S">S Sakit: <b>${s}</b></span>
     <span class="status-I">I Izin: <b>${i}</b></span>
     <span class="status-A">A Alfa: <b>${a}</b></span>
-    <span>📅 Pertemuan: <b>${currentMeeting}/${c.meetings}</b></span>
-    <button class="btn-green" style="padding:2px 8px; font-size:12px; margin-left:auto;" onclick="openAddStudentModal()">➕ Tambah Siswa</button>`;
+    <span>📅 Pertemuan: <b>${currentMeeting}/${c.meetings}</b></span>`;
 }
 
 function renderMeetingForm() {
