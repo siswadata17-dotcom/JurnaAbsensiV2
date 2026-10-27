@@ -493,16 +493,23 @@ function getEmbeddedState() {
 }
 
 function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const legacy = !raw ? (localStorage.getItem('absensiSiswa_v13') || localStorage.getItem('absensiSiswa_v12') || localStorage.getItem('absensiSiswa_v11') || localStorage.getItem('absensiSiswa_v10') || localStorage.getItem('absensiSiswa_v9') || localStorage.getItem('absensiSiswa_v8') || localStorage.getItem('absensiSiswa_v7') || localStorage.getItem('absensiSiswa_v6') || localStorage.getItem('absensiSiswa_v5')) : raw;
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      if (parsed && parsed.classes) {
+        return migrateState(parsed);
+      }
+    }
+  } catch(e) {}
+
   const embedded = getEmbeddedState();
   if (embedded && embedded.classes) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(embedded)); } catch(e) {}
     return migrateState(embedded);
   }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const legacy = !raw ? (localStorage.getItem('absensiSiswa_v13') || localStorage.getItem('absensiSiswa_v12') || localStorage.getItem('absensiSiswa_v11') || localStorage.getItem('absensiSiswa_v10') || localStorage.getItem('absensiSiswa_v9') || localStorage.getItem('absensiSiswa_v8') || localStorage.getItem('absensiSiswa_v7') || localStorage.getItem('absensiSiswa_v6') || localStorage.getItem('absensiSiswa_v5')) : raw;
-    if (legacy) return migrateState(JSON.parse(legacy));
-  } catch(e) {}
+
   return defaultState();
 }
 
@@ -541,10 +548,13 @@ function migrateState(s) {
     if (!Array.isArray(s.schedule.jumat)) s.schedule.jumat = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_JUMAT));
   }
 
-  if (!Array.isArray(s.teacherSchedule)) {
+  if (!Array.isArray(s.teacherSchedule) || s.teacherSchedule.length === 0) {
     s.teacherSchedule = [
       { id: 'ts_1', day: 'Senin', className: 'X DKV 1', startHour: 1, endHour: 3, subject: 'Informatika' },
-      { id: 'ts_2', day: 'Selasa', className: 'X DKV 2', startHour: 7, endHour: 9, subject: 'Informatika' }
+      { id: 'ts_2', day: 'Selasa', className: 'X DKV 1', startHour: 1, endHour: 3, subject: 'Informatika' },
+      { id: 'ts_3', day: 'Rabu', className: 'X DKV 2', startHour: 1, endHour: 3, subject: 'Informatika' },
+      { id: 'ts_4', day: 'Kamis', className: 'X DKV 3', startHour: 1, endHour: 3, subject: 'Informatika' },
+      { id: 'ts_5', day: 'Jumat', className: 'X TAB 1', startHour: 1, endHour: 3, subject: 'Informatika' }
     ];
   }
 
@@ -574,9 +584,60 @@ function migrateState(s) {
   return s;
 }
 
+/* ===== INDEXEDDB OFFLINE STORAGE ===== */
+const IDB_NAME = 'AbsensiSiswaDB';
+const IDB_STORE = 'appStateStore';
+const IDB_VERSION = 1;
+
+function openIDB() {
+  return new Promise(resolve => {
+    if (!window.indexedDB) { resolve(null); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function saveStateToIDB(data) {
+  try {
+    const db = await openIDB();
+    if (!db) return;
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const store = tx.objectStore(IDB_STORE);
+    store.put(data, STORAGE_KEY);
+  } catch(e) {}
+}
+
+async function loadStateFromIDB() {
+  try {
+    const db = await openIDB();
+    if (!db) return null;
+    return new Promise(resolve => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.get(STORAGE_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch(e) {
+    return null;
+  }
+}
+
 function saveState() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-  catch(e) { toast('Penyimpanan penuh! Export Excel segera.', 'error'); }
+  let localStorageSaved = false;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorageSaved = true;
+  } catch(e) {}
+
+  saveStateToIDB(state);
 }
 
 function esc(s) {
@@ -2109,9 +2170,64 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeSettingsModal(); }
 });
 
+/* ===== SINKRONISASI JADWAL REAL-TIME ===== */
+function autoSelectTodayClass(isManualTrigger = false) {
+  if (!state || !state.classes || state.classes.length === 0) return;
+
+  const now = new Date();
+  const dayName = DAY_NAMES[now.getDay()]; // 'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
+  const curHour = detectCurrentHour();
+
+  const schedsToday = (state.teacherSchedule || []).filter(item => item.day === dayName);
+
+  if (schedsToday.length === 0) {
+    if (isManualTrigger) {
+      toast(`ℹ️ Tidak ada jadwal mengajar pada hari ${dayName}.`, 'error');
+    }
+    return;
+  }
+
+  // Cari jadwal yang jam nya sedang berlangsung
+  let match = schedsToday.find(s => curHour >= s.startHour && curHour <= s.endHour);
+
+  // Jika di luar jam pelajaran, ambil jadwal pertama hari ini
+  if (!match) {
+    match = schedsToday[0];
+  }
+
+  const foundIdx = state.classes.findIndex(c => c.name.trim().toLowerCase() === match.className.trim().toLowerCase());
+
+  if (foundIdx >= 0) {
+    const classChanged = currentClass !== foundIdx;
+    currentClass = foundIdx;
+    if (match.subject && state.subjects.includes(match.subject)) {
+      state.classes[currentClass].subject = match.subject;
+    }
+    render();
+    if (isManualTrigger || classChanged) {
+      toast(`⚡ Otomatis terdeteksi: Kelas ${state.classes[currentClass].name} (${dayName}, Jam Ke-${match.startHour}-${match.endHour})`);
+    }
+  } else if (isManualTrigger) {
+    toast(`⚠️ Kelas ${match.className} tidak ditemukan di daftar kelas.`, 'error');
+  }
+}
+
 /* ===== INIT ===== */
 startClock();
 render();
+autoSelectTodayClass(false);
+
+loadStateFromIDB().then(idbState => {
+  if (idbState && idbState.classes) {
+    const localRaw = localStorage.getItem(STORAGE_KEY);
+    if (!localRaw) {
+      state = migrateState(idbState);
+      saveState();
+      render();
+      autoSelectTodayClass(false);
+    }
+  }
+});
 </script>
 
 
