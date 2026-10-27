@@ -13,7 +13,11 @@
   .school-info p { font-size: 12px; opacity: .9; margin-top: 2px; }
   .school-info .teacher { font-size: 12px; margin-top: 4px; background: rgba(255,255,255,.15); display: inline-block; padding: 3px 10px; border-radius: 3px; }
   .school-badge { background: rgba(255,255,255,.15); padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-  .toolbar { padding: 12px 20px; background: #fafafa; border-bottom: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .toolbar { padding: 12px 20px; background: #fafafa; border-bottom: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .toolbar-left { display: flex; flex-direction: column; gap: 6px; }
+  .class-subject-panel { display: flex; flex-direction: column; gap: 6px; }
+  .class-subject-panel .control-row { display: flex; align-items: center; gap: 8px; }
+  .class-subject-panel label { font-weight: bold; font-size: 13px; min-width: 48px; }
   .toolbar label { font-weight: bold; font-size: 13px; }
   select, button, input, textarea { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; font-family: inherit; background: #fff; }
   button { cursor: pointer; }
@@ -52,7 +56,7 @@
   .status-S { background: #fee2e2; color: #991b1b; }
   .status-I { background: #fef3c7; color: #92400e; }
   .status-A { background: #e5e7eb; color: #374151; }
-  .nav-group { margin-left: auto; display: flex; gap: 5px; align-items: center; }
+  .nav-group { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .legend { padding: 8px 20px; font-size: 12px; color: #666; border-top: 1px solid #eee; }
   .legend span { display: inline-block; padding: 2px 8px; margin-right: 5px; border-radius: 3px; font-weight: bold; }
   .empty { text-align: center; padding: 35px 20px; color: #888; }
@@ -155,32 +159,40 @@
   </header>
 
   <div class="toolbar">
-    <button class="btn-dark" onclick="openSettingsModal()">⚙️ Settings</button>
-    <div class="separator"></div>
-    <label>Kelas:</label>
-    <select id="classSelect"><option value="0">X DKV 1 (0)</option><option value="1">X DKV 2 (0)</option><option value="2">X DKV 3 (0)</option><option value="3">X TAB 1 (0)</option><option value="4">X TAB 2 (0)</option><option value="5">X TBSM 1 (0)</option><option value="6">X TBKR (0)</option><option value="7">XI DKV 1 (0)</option><option value="8">XI DKV 3 (0)</option></select>
-    <label>Mapel:</label>
-    <select id="subjectSelect" onchange="changeClassSubject(this.value)"><option value="Informatika">Informatika</option><option value="Pendidikan Agama Islam">Pendidikan Agama Islam</option><option value="Produk Kreatif dan Kewirausahaan">Produk Kreatif dan Kewirausahaan</option></select>
+    <div class="toolbar-left">
+      <button class="btn-dark" onclick="openSettingsModal()">⚙️ Settings</button>
+      <!-- Consolidated Action Menu Dropdown -->
+      <div class="dropdown" id="mainMenuDropdown">
+        <button class="btn-blue" onclick="toggleDropdown('mainMenuDropdownMenu')">⚡ Menu Aksi ▾</button>
+        <div class="dropdown-menu" id="mainMenuDropdownMenu">
+          <div class="dropdown-header">📥 Import / Export Data</div>
+          <button class="dropdown-item" onclick="importExcel(); closeAllDropdowns();">📥 Import Excel Siswa</button>
+          <button class="dropdown-item" onclick="exportExcel(); closeAllDropdowns();"> Export Excel Rekap</button>
+          <button class="dropdown-item" onclick="downloadTemplate(); closeAllDropdowns();">📋 Download Template Excel</button>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-header">🖨️ Cetak & Sinkronisasi</div>
+          <button class="dropdown-item" onclick="printRekap(currentClass); closeAllDropdowns();">🖨️ Cetak Rekap Kelas Ini</button>
+          <button class="dropdown-item" onclick="printAllRekap(); closeAllDropdowns();">🖨️ Cetak Semua Kelas</button>
+          <button class="dropdown-item" onclick="syncToGoogleSheets(); closeAllDropdowns();">☁️ Sync Google Sheets</button>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-header">💾 Backup & Reset</div>
+          <button class="dropdown-item" onclick="downloadHTML(); closeAllDropdowns();"> Download HTML Aplikasi</button>
+          <button class="dropdown-item text-red" onclick="resetData(); closeAllDropdowns();">🧹 Reset Data Siswa & Absensi</button>
+          <button class="dropdown-item text-red" onclick="resetTotal(); closeAllDropdowns();">🗑 Reset Total Aplikasi</button>
+        </div>
+      </div>
+    </div>
+
     <div class="separator"></div>
 
-    <!-- Consolidated Action Menu Dropdown -->
-    <div class="dropdown" id="mainMenuDropdown">
-      <button class="btn-blue" onclick="toggleDropdown('mainMenuDropdownMenu')">⚡ Menu Aksi ▾</button>
-      <div class="dropdown-menu" id="mainMenuDropdownMenu">
-        <div class="dropdown-header">📥 Import / Export Data</div>
-        <button class="dropdown-item" onclick="importExcel(); closeAllDropdowns();">📥 Import Excel Siswa</button>
-        <button class="dropdown-item" onclick="exportExcel(); closeAllDropdowns();"> Export Excel Rekap</button>
-        <button class="dropdown-item" onclick="downloadTemplate(); closeAllDropdowns();">📋 Download Template Excel</button>
-        <div class="dropdown-divider"></div>
-        <div class="dropdown-header">🖨️ Cetak & Sinkronisasi</div>
-        <button class="dropdown-item" onclick="printRekap(currentClass); closeAllDropdowns();">🖨️ Cetak Rekap Kelas Ini</button>
-        <button class="dropdown-item" onclick="printAllRekap(); closeAllDropdowns();">🖨️ Cetak Semua Kelas</button>
-        <button class="dropdown-item" onclick="syncToGoogleSheets(); closeAllDropdowns();">☁️ Sync Google Sheets</button>
-        <div class="dropdown-divider"></div>
-        <div class="dropdown-header">💾 Backup & Reset</div>
-        <button class="dropdown-item" onclick="downloadHTML(); closeAllDropdowns();"> Download HTML Aplikasi</button>
-        <button class="dropdown-item text-red" onclick="resetData(); closeAllDropdowns();">🧹 Reset Data Siswa & Absensi</button>
-        <button class="dropdown-item text-red" onclick="resetTotal(); closeAllDropdowns();">🗑 Reset Total Aplikasi</button>
+    <div class="class-subject-panel">
+      <div class="control-row">
+        <label>Kelas:</label>
+        <select id="classSelect"><option value="0">X DKV 1 (0)</option><option value="1">X DKV 2 (0)</option><option value="2">X DKV 3 (0)</option><option value="3">X TAB 1 (0)</option><option value="4">X TAB 2 (0)</option><option value="5">X TBSM 1 (0)</option><option value="6">X TBKR (0)</option><option value="7">XI DKV 1 (0)</option><option value="8">XI DKV 3 (0)</option></select>
+      </div>
+      <div class="control-row">
+        <label>Mapel:</label>
+        <select id="subjectSelect" onchange="changeClassSubject(this.value)"><option value="Informatika">Informatika</option><option value="Pendidikan Agama Islam">Pendidikan Agama Islam</option><option value="Produk Kreatif dan Kewirausahaan">Produk Kreatif dan Kewirausahaan</option></select>
       </div>
     </div>
 
@@ -190,6 +202,16 @@
       <span id="meetingLabel" style="font-weight:bold; padding:0 5px;">Pertemuan 1</span>
       <button class="btn-gray" onclick="nextMeeting()">▶</button>
       <button class="btn-blue" onclick="addMeeting()">+ Pertemuan</button>
+      <!-- Meeting Action Dropdown Menu -->
+      <div class="dropdown" id="meetingMenuDropdown">
+        <button class="btn-purple" onclick="toggleDropdown('meetingMenuDropdownMenu')">⚡ Aksi Pertemuan ▾</button>
+        <div class="dropdown-menu dropdown-menu-right" id="meetingMenuDropdownMenu">
+          <button class="dropdown-item" onclick="exportMeetingFile(); closeAllDropdowns();">📤 Export Pertemuan (JSON)</button>
+          <button class="dropdown-item" onclick="importMeetingFile(); closeAllDropdowns();">📥 Import Pertemuan (JSON)</button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" onclick="openSyncMeetingModal(); closeAllDropdowns();">👯 Samakan ke Kelas Lain</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -990,15 +1012,6 @@ function renderMeetingForm() {
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px;">
       <div style="font-size:11px; color:#6b7280;">
         📅 Hari: <b>${dayName}</b> • Mapel: <b>${esc(c.subject)}</b> • 🏫 Kelas: <b>${esc(c.name)}</b>
-      </div>
-      <div class="dropdown" id="meetingMenuDropdown">
-        <button class="btn-purple" style="padding:4px 10px; font-size:12px;" onclick="toggleDropdown('meetingMenuDropdownMenu')">⚡ Aksi Pertemuan ▾</button>
-        <div class="dropdown-menu dropdown-menu-right" id="meetingMenuDropdownMenu">
-          <button class="dropdown-item" onclick="exportMeetingFile(); closeAllDropdowns();">📤 Export Pertemuan (JSON)</button>
-          <button class="dropdown-item" onclick="importMeetingFile(); closeAllDropdowns();">📥 Import Pertemuan (JSON)</button>
-          <div class="dropdown-divider"></div>
-          <button class="dropdown-item" onclick="openSyncMeetingModal(); closeAllDropdowns();">👯 Samakan ke Kelas Lain</button>
-        </div>
       </div>
     </div>`;
 }
