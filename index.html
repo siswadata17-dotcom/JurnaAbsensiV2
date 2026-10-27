@@ -332,6 +332,31 @@
   </div>
 </div>
 
+<!-- Modal Samakan Pertemuan Ke Kelas Lain -->
+<div class="modal-bg" id="syncMeetingModal">
+  <div class="modal">
+    <h3>👯 Samakan Pertemuan ke Kelas Lain</h3>
+    <p>Pilih kelas-kelas yang ingin disamakan tanggal, jam pelajaran, dan materinya dengan <b>Pertemuan <span id="syncMeetingNum">1</span></b> dari kelas <b id="syncMeetingSourceClass">-</b>.</p>
+    <div style="background:#f0f4ff; border:1px solid #93c5fd; padding:10px; border-radius:4px; font-size:12px; margin-bottom:12px;">
+      <div>📅 Tanggal: <b id="syncMeetingDate">-</b></div>
+      <div>⏰ Jam: <b id="syncMeetingHour">-</b></div>
+      <div>📖 Materi: <i id="syncMeetingMaterial">-</i></div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:bold; font-size:12px; cursor:pointer;">
+        <input type="checkbox" id="selectAllSyncClasses" onchange="toggleSelectAllSyncClasses(this.checked)"> Pilih Semua Kelas
+      </label>
+    </div>
+    <div id="syncClassListContainer" style="max-height:200px; overflow-y:auto; border:1px solid #ddd; border-radius:4px; padding:8px;"></div>
+    <div class="modal-actions" style="margin-top:15px;">
+      <button onclick="closeSyncMeetingModal()">Batal</button>
+      <button class="btn-green" onclick="applyMeetingSync()">⚡ Terapkan ke Kelas Terpilih</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="meetingFileInput" accept=".json" style="display:none" onchange="handleMeetingFile(event)">
+
 <!-- Modal Konfirmasi -->
 <div class="modal-bg" id="modal">
   <div class="modal">
@@ -407,7 +432,9 @@ function defaultState() {
       name: `Kelas ${i}`,
       subject: DEFAULT_SUBJECTS[0],
       students: [], attendance: {},
-      meetings: 0, meetingsData: {}
+      meetings: 0, meetingsData: {},
+      startHour: 1,
+      endHour: 3
     });
   }
   return {
@@ -495,6 +522,8 @@ function migrateState(s) {
     c.meetings = Math.min(MAX_MEETINGS, Number(c.meetings) || 0);
     if (!c.subject || !s.subjects.includes(c.subject)) c.subject = s.subjects[0];
     if (!c.name) c.name = `Kelas ${i+1}`;
+    if (!c.startHour) c.startHour = 1;
+    if (!c.endHour) c.endHour = (c.name && c.name.toLowerCase().includes('dkv 1')) ? 3 : (c.startHour ? c.startHour + 2 : 3);
   });
 
   if (s.classes.length === 0) {
@@ -690,7 +719,15 @@ function renderMeetingForm() {
     form.innerHTML = `<p style="text-align:center;color:#92400e;font-size:13px;">Klik "+ Pertemuan" untuk memulai — jam otomatis terdeteksi sesuai hari ini</p>`;
     return;
   }
-  if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = { date:'', hour:1, material:'' };
+  const startH = c.startHour || 1;
+  const endH = c.endHour || 3;
+
+  if (!c.meetingsData[currentMeeting]) {
+    c.meetingsData[currentMeeting] = { date: getLocalDateString(), hour: startH, material: '' };
+  } else if (!c.meetingsData[currentMeeting].hour) {
+    c.meetingsData[currentMeeting].hour = startH;
+  }
+
   const d = c.meetingsData[currentMeeting];
   const today = getLocalDateString();
   const meetingDate = d.date || today;
@@ -705,11 +742,18 @@ function renderMeetingForm() {
                    : info.status === 'before' ? ' Belum mulai' : '✅ Sudah selesai';
   let opts = '';
   schedForDate.forEach(s => {
+    const isTarget = s.hour >= startH && s.hour <= endH;
+    const badgeStr = isTarget ? ' ⭐ (Jam Mengajar)' : '';
     const selected = d.hour == s.hour ? 'selected' : '';
-    opts += `<option value="${s.hour}" ${selected}>Jam Ke-${s.hour} (${s.start} - ${s.end})</option>`;
+    opts += `<option value="${s.hour}" ${selected}>Jam Ke-${s.hour} (${s.start} - ${s.end})${badgeStr}</option>`;
   });
   form.innerHTML = `
-    <h3>📝 Pertemuan ${currentMeeting} • ${esc(c.subject)}</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+      <h3 style="margin:0;">📝 Pertemuan ${currentMeeting} • ${esc(c.subject)}</h3>
+      <div style="background:#dbeafe; border:1px solid #93c5fd; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:bold; color:#1e40af;">
+        ⏰ Jam Mengajar Kelas: Jam Ke-${startH} s/d ${endH}
+      </div>
+    </div>
     <div class="clock-info">
       <span>🕐 Waktu sekarang: <b>${formatClock()}</b></span>
       <span class="auto-badge">Auto: Jam Ke-${info.hour}</span>
@@ -728,9 +772,160 @@ function renderMeetingForm() {
       <div style="flex:3"><label>Materi yang Disampaikan</label>
         <textarea id="meetingMaterial" placeholder="Tuliskan materi..." onchange="updateMeetingData()">${esc(d.material)}</textarea></div>
     </div>
-    <div style="font-size:11px; color:#6b7280; margin-top:4px;">
-      📅 Hari: <b>${dayName}</b> •  Mapel: <b>${esc(c.subject)}</b> • 🏫 Kelas: <b>${esc(c.name)}</b>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px;">
+      <div style="font-size:11px; color:#6b7280;">
+        📅 Hari: <b>${dayName}</b> • Mapel: <b>${esc(c.subject)}</b> • 🏫 Kelas: <b>${esc(c.name)}</b>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn-purple" style="padding:4px 8px; font-size:12px;" onclick="exportMeetingFile()">📤 Export Pertemuan</button>
+        <button class="btn-blue" style="padding:4px 8px; font-size:12px;" onclick="importMeetingFile()">📥 Import Pertemuan</button>
+        <button class="btn-orange" style="padding:4px 8px; font-size:12px;" onclick="openSyncMeetingModal()">👯 Samakan ke Kelas Lain</button>
+      </div>
     </div>`;
+}
+
+/* ===== EXPORT / IMPORT / SYNC PERTEMUAN ===== */
+function exportMeetingFile() {
+  const c = state.classes[currentClass];
+  if (c.meetings === 0) {
+    toast('Belum ada pertemuan untuk diexport!', 'error');
+    return;
+  }
+  const d = c.meetingsData[currentMeeting] || {};
+  const data = {
+    type: 'absensi_meeting_data',
+    version: '1.0',
+    meetingNumber: currentMeeting,
+    className: c.name,
+    subject: c.subject,
+    date: d.date || getLocalDateString(),
+    hour: d.hour || (c.startHour || 1),
+    material: d.material || '',
+    exportedAt: new Date().toISOString()
+  };
+  const jsonStr = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeClassName = c.name.replace(/[^a-zA-Z0-9]/g, '_');
+  a.href = url;
+  a.download = `Pertemuan_${currentMeeting}_${safeClassName}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(`✅ File Pertemuan ${currentMeeting} (${c.name}) diexport`);
+}
+
+function importMeetingFile() {
+  document.getElementById('meetingFileInput').click();
+}
+
+function handleMeetingFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data || (data.type !== 'absensi_meeting_data' && data.material === undefined)) {
+        toast('Format file pertemuan tidak valid!', 'error');
+        return;
+      }
+      const c = state.classes[currentClass];
+      if (c.meetings === 0) {
+        addMeeting();
+      }
+      if (!c.meetingsData[currentMeeting]) c.meetingsData[currentMeeting] = {};
+      if (data.date) c.meetingsData[currentMeeting].date = data.date;
+      if (data.hour) c.meetingsData[currentMeeting].hour = +data.hour;
+      if (data.material !== undefined) c.meetingsData[currentMeeting].material = data.material;
+      saveState();
+      renderMeetingForm();
+      toast(`✅ Data Pertemuan ${currentMeeting} berhasil diimport!`);
+    } catch(err) {
+      toast('Gagal import file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function openSyncMeetingModal() {
+  const c = state.classes[currentClass];
+  if (c.meetings === 0) {
+    toast('Belum ada pertemuan untuk disamakan!', 'error');
+    return;
+  }
+  const d = c.meetingsData[currentMeeting] || {};
+  document.getElementById('syncMeetingNum').textContent = currentMeeting;
+  document.getElementById('syncMeetingSourceClass').textContent = c.name;
+  document.getElementById('syncMeetingDate').textContent = d.date || getLocalDateString();
+  document.getElementById('syncMeetingHour').textContent = `Jam Ke-${d.hour || (c.startHour || 1)}`;
+  document.getElementById('syncMeetingMaterial').textContent = d.material || '(kosong)';
+
+  const container = document.getElementById('syncClassListContainer');
+  let html = '';
+  state.classes.forEach((cls, idx) => {
+    if (idx === currentClass) return;
+    html += `
+      <div style="margin-bottom:6px;">
+        <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" class="sync-class-checkbox" value="${idx}">
+          <span><b>${esc(cls.name)}</b> (${esc(cls.subject || '-')}) — ${cls.meetings} Pertemuan</span>
+        </label>
+      </div>`;
+  });
+  if (!html) {
+    html = '<div style="color:#888; font-size:12px;">Tidak ada kelas lain.</div>';
+  }
+  container.innerHTML = html;
+  document.getElementById('selectAllSyncClasses').checked = false;
+  document.getElementById('syncMeetingModal').classList.add('show');
+}
+
+function closeSyncMeetingModal() {
+  document.getElementById('syncMeetingModal').classList.remove('show');
+}
+
+function toggleSelectAllSyncClasses(checked) {
+  document.querySelectorAll('.sync-class-checkbox').forEach(cb => cb.checked = checked);
+}
+
+function applyMeetingSync() {
+  const c = state.classes[currentClass];
+  const sourceM = c.meetingsData[currentMeeting] || {};
+  const checkboxes = document.querySelectorAll('.sync-class-checkbox:checked');
+  if (checkboxes.length === 0) {
+    toast('Pilih minimal 1 kelas tujuan!', 'error');
+    return;
+  }
+  let count = 0;
+  checkboxes.forEach(cb => {
+    const targetIdx = +cb.value;
+    const targetClass = state.classes[targetIdx];
+    if (targetClass) {
+      if (targetClass.meetings < currentMeeting) {
+        targetClass.meetings = currentMeeting;
+        targetClass.students.forEach(st => {
+          if (!targetClass.attendance[st.id]) targetClass.attendance[st.id] = {};
+          for (let m = 1; m <= currentMeeting; m++) {
+            if (!targetClass.attendance[st.id][m]) targetClass.attendance[st.id][m] = 'H';
+          }
+        });
+      }
+      if (!targetClass.meetingsData[currentMeeting]) {
+        targetClass.meetingsData[currentMeeting] = {};
+      }
+      targetClass.meetingsData[currentMeeting].date = sourceM.date || getLocalDateString();
+      targetClass.meetingsData[currentMeeting].hour = sourceM.hour || (targetClass.startHour || 1);
+      targetClass.meetingsData[currentMeeting].material = sourceM.material || '';
+      count++;
+    }
+  });
+  saveState();
+  closeSyncMeetingModal();
+  toast(`✅ Berhasil menyamakan Pertemuan ${currentMeeting} ke ${count} kelas!`);
 }
 
 function onDateChange() {
@@ -852,13 +1047,15 @@ function renderClassList() {
     const isActive = idx === currentClass;
     const studentCount = cls.students ? cls.students.length : 0;
     const meetingCount = cls.meetings || 0;
+    const startH = cls.startHour || 1;
+    const endH = cls.endHour || 3;
     html += `<div class="class-item ${isActive ? 'active' : ''}" id="class-item-${idx}">
       <div class="class-info">
         <span class="class-name" id="class-name-${idx}">
           ${isActive ? '🔵 ' : ''}${esc(cls.name)}
         </span>
         <span class="class-meta">
-          📖 ${esc(cls.subject || '-')} • 👥 ${studentCount} siswa • 📅 ${meetingCount} pertemuan
+          📖 ${esc(cls.subject || '-')} • ⏰ Jam Ke-${startH} s/d ${endH} • 👥 ${studentCount} siswa • 📅 ${meetingCount} pertemuan
         </span>
       </div>
       <div class="class-actions">
@@ -873,14 +1070,22 @@ function renderClassList() {
 
 function startEditClass(idx) {
   const item = document.getElementById(`class-item-${idx}`);
-  const nameEl = document.getElementById(`class-name-${idx}`);
-  const oldName = tempClasses[idx].name;
+  const cls = tempClasses[idx];
+  const oldName = cls.name;
+  const startH = cls.startHour || 1;
+  const endH = cls.endHour || 3;
 
   const infoEl = item.querySelector('.class-info');
   item.classList.add('editing');
   infoEl.innerHTML = `
-    <input type="text" id="class-edit-${idx}" value="${esc(oldName)}" maxlength="30" placeholder="Nama kelas...">
-    <span class="class-meta">Tekan Enter untuk simpan, Esc untuk batal</span>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; width:100%;">
+      <input type="text" id="class-edit-${idx}" value="${esc(oldName)}" maxlength="30" placeholder="Nama kelas..." style="flex:2; min-width:110px;">
+      <span style="font-size:11px; font-weight:bold;">Jam Ke-</span>
+      <input type="number" id="class-start-${idx}" value="${startH}" min="1" max="20" style="width:45px; text-align:center;">
+      <span style="font-size:11px;">s/d</span>
+      <input type="number" id="class-end-${idx}" value="${endH}" min="1" max="20" style="width:45px; text-align:center;">
+    </div>
+    <span class="class-meta" style="margin-top:2px;">Tekan Enter untuk simpan, Esc untuk batal</span>
   `;
   const input = document.getElementById(`class-edit-${idx}`);
   input.focus();
@@ -892,24 +1097,34 @@ function startEditClass(idx) {
     <button class="btn-gray" onclick="cancelEditClass(${idx})">✖</button>
   `;
 
-  input.onkeydown = e => {
+  const onKey = e => {
     if (e.key === 'Enter') saveEditClass(idx);
     if (e.key === 'Escape') cancelEditClass(idx);
   };
+  input.onkeydown = onKey;
+  document.getElementById(`class-start-${idx}`).onkeydown = onKey;
+  document.getElementById(`class-end-${idx}`).onkeydown = onKey;
 }
 
 function saveEditClass(idx) {
   const input = document.getElementById(`class-edit-${idx}`);
+  const startInp = document.getElementById(`class-start-${idx}`);
+  const endInp = document.getElementById(`class-end-${idx}`);
   const newName = input.value.trim();
   const oldName = tempClasses[idx].name;
+  const sH = Math.max(1, parseInt(startInp.value) || 1);
+  const eH = Math.max(sH, parseInt(endInp.value) || sH);
+
   if (!newName) { toast('Nama kelas tidak boleh kosong!', 'error'); return; }
   if (newName.length > 30) { toast('Maksimal 30 karakter!', 'error'); return; }
   if (tempClasses.some((c, i) => i !== idx && c.name.toLowerCase() === newName.toLowerCase())) {
     toast(`Nama kelas "${newName}" sudah ada!`, 'error'); return;
   }
   tempClasses[idx].name = newName;
+  tempClasses[idx].startHour = sH;
+  tempClasses[idx].endHour = eH;
   renderClassList();
-  toast(`✅ "${oldName}" → "${newName}"`);
+  toast(`✅ "${oldName}" diperbarui (Jam ${sH} s/d ${eH})`);
 }
 
 function cancelEditClass(idx) {
@@ -938,7 +1153,9 @@ function addClass() {
     students: [],
     attendance: {},
     meetings: 0,
-    meetingsData: {}
+    meetingsData: {},
+    startHour: 1,
+    endHour: 3
   });
   input.value = '';
   renderClassList();
@@ -982,7 +1199,9 @@ function resetClassesToDefault() {
           name: `Kelas ${i}`,
           subject: state.subjects[0],
           students: [], attendance: {},
-          meetings: 0, meetingsData: {}
+          meetings: 0, meetingsData: {},
+          startHour: 1,
+          endHour: 3
         });
       }
       currentClass = 0;
@@ -1376,14 +1595,16 @@ function addMeeting() {
   if (c.meetings >= MAX_MEETINGS) { toast(`Maksimal ${MAX_MEETINGS} pertemuan!`, 'error'); return; }
   c.meetings++;
   currentMeeting = c.meetings;
+  const startH = c.startHour || 1;
   const detectedHour = detectCurrentHour();
+  const initialHour = (detectedHour >= (c.startHour||1) && detectedHour <= (c.endHour||3)) ? detectedHour : startH;
   c.students.forEach(st => {
     if (!c.attendance[st.id]) c.attendance[st.id] = {};
     c.attendance[st.id][currentMeeting] = c.attendance[st.id][currentMeeting] || 'H';
   });
   const now = new Date();
   const todayStr = getLocalDateString(now);
-  c.meetingsData[currentMeeting] = { date: todayStr, hour: detectedHour, material: '' };
+  c.meetingsData[currentMeeting] = { date: todayStr, hour: initialHour, material: '' };
   render();
   toast(`✅ Pertemuan ${currentMeeting} — ${DAY_NAMES[now.getDay()]}, Jam Ke-${detectedHour}`);
 }
