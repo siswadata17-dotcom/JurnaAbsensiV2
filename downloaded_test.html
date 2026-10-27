@@ -125,10 +125,24 @@
   .toast { position: fixed; top: 15px; right: 15px; background: #10b981; color: #fff; padding: 10px 16px; border-radius: 4px; font-size: 13px; z-index: 300; opacity: 0; transition: opacity .3s; }
   .toast.show { opacity: 1; }
   @media (max-width: 640px) {
+    body { font-size: 13px; }
     .toolbar, .info-bar, .meeting-form, .table-wrap { padding: 10px; }
-    .nav-group { margin-left: 0; }
-    header { flex-direction: column; align-items: flex-start; }
+    .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .toolbar-left { flex-direction: row; flex-wrap: wrap; width: 100%; justify-content: flex-start; gap: 8px; }
+    .toolbar-left .btn-dark, .toolbar-left .dropdown, .toolbar-left button { flex: 1 1 auto; }
+    .separator { display: none; }
+    .class-subject-panel { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+    .class-subject-panel .control-row { flex: 1 1 calc(50% - 8px); min-width: 130px; }
+    .class-subject-panel select { width: 100%; }
+    .nav-group { width: 100%; justify-content: space-between; margin-left: 0; }
+    header { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 15px; }
+    .school-info h1 { font-size: 16px; }
+    .school-badge { align-self: flex-start; }
+    .info-bar { flex-direction: row; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .form-row { flex-direction: column; gap: 8px; }
+    .form-row > div { width: 100%; }
     .print-settings { grid-template-columns: 1fr; }
+    .modal { padding: 15px; width: 98%; }
   }
 
   /* Dropdown Styling */
@@ -146,13 +160,13 @@
 </style>
 </head>
 <body>
-<script id="embedded-data" type="application/json">{"schoolName":"SMKN 1 TEST GONDANG","schoolAddress":"JL. Tunjungan - Gondang Km 3, Gondang, Kabupaten Sragen, Jawa Tengah 57254","academicYear":"2026/2027","teacherName":"Suhardi, S. Pd.","nip":"198908172022211016","subjects":["Informatika","Pendidikan Agama Islam","Produk Kreatif dan Kewirausahaan"],"printSettings":{"paperSize":"F4","orientation":"landscape"},"schedule":{"senin":[{"hour":1,"start":"07:00","end":"07:45"},{"hour":2,"start":"07:45","end":"08:30"},{"hour":3,"start":"08:30","end":"09:30"},{"hour":4,"start":"09:30","end":"10:15"},{"hour":5,"start":"10:15","end":"11:00"},{"hour":6,"start":"11:00","end":"11:45"},{"hour":7,"start":"11:45","end":"12:55"},{"hour":8,"start":"12:55","end":"13:40"},{"hour":9,"start":"13:40","end":"14:25"},{"hour":10,"start":"14:25","end":"15:10"}],"selasa_kamis":[{"hour":1,"start":"07:00","end":"07:45"},{"hour":2,"start":"07:45","end":"08:30"},{"hour":3,"start":"08:30","end":"09:30"},{"hour":4,"start":"09:30","end":"10:15"},{"hour":5,"start":"10:15","end":"11:00"},{"hour":6,"start":"11:00","end":"12:10"},{"hour":7,"start":"12:10","end":"12:50"},{"hour":8,"start":"12:50","end":"13:30"},{"hour":9,"start":"13:30","end":"14:10"},{"hour":10,"start":"14:10","end":"14:50"},{"hour":11,"start":"14:50","end":"15:30"}],"jumat":[{"hour":1,"start":"07:00","end":"07:45"},{"hour":2,"start":"07:45","end":"08:30"},{"hour":3,"start":"08:30","end":"09:30"},{"hour":4,"start":"09:30","end":"10:15"},{"hour":5,"start":"10:15","end":"11:00"},{"hour":6,"start":"11:00","end":"11:45"},{"hour":7,"start":"12:30","end":"13:15"},{"hour":8,"start":"13:15","end":"14:00"}]},"classes":[{"id":1,"name":"X DKV 1","subject":"Informatika","students":[{"id":"s_1793096945765_g7e371","nis":"99-002","name":"SITI AMINAH"}],"attendance":{"s_1793096945765_g7e371":{"1":"H"}},"meetings":1,"meetingsData":{"1":{"date":"2026-10-27","hour":1,"material":""}},"startHour":1,"endHour":3},{"id":2,"name":"X DKV 2","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":3,"name":"X DKV 3","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":4,"name":"X TAB 1","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":5,"name":"X TAB 2","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":6,"name":"X TBSM 1","subject":"Pendidikan Agama Islam","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":7,"name":"X TBKR","subject":"Pendidikan Agama Islam","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":8,"name":"XI DKV 1","subject":"Pendidikan Agama Islam","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":9,"name":"XI DKV 3","subject":"Produk Kreatif dan Kewirausahaan","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3}],"googleScriptUrl":"","teacherSchedule":[{"id":"ts_1","day":"Senin","className":"X DKV 1","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_2","day":"Selasa","className":"X DKV 1","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_3","day":"Rabu","className":"X DKV 2","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_4","day":"Kamis","className":"X DKV 3","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_5","day":"Jumat","className":"X TAB 1","startHour":1,"endHour":3,"subject":"Informatika"}],"updatedAt":1793096945966}</script>
+<script id="embedded-data" type="application/json">{"schoolName":"SMKN 1 TEST GONDANG","schoolAddress":"JL. Tunjungan - Gondang Km 3, Gondang, Kabupaten Sragen, Jawa Tengah 57254","academicYear":"2026/2027","teacherName":"Suhardi, S. Pd.","nip":"198908172022211016","subjects":["Informatika","Pendidikan Agama Islam","Produk Kreatif dan Kewirausahaan"],"printSettings":{"paperSize":"F4","orientation":"landscape"},"schedule":{"senin":[{"hour":1,"start":"07:00","end":"07:45"},{"hour":2,"start":"07:45","end":"08:30"},{"hour":3,"start":"08:30","end":"09:30"},{"hour":4,"start":"09:30","end":"10:15"},{"hour":5,"start":"10:15","end":"11:00"},{"hour":6,"start":"11:00","end":"11:45"},{"hour":7,"start":"11:45","end":"12:55"},{"hour":8,"start":"12:55","end":"13:40"},{"hour":9,"start":"13:40","end":"14:25"},{"hour":10,"start":"14:25","end":"15:10"}],"selasa_kamis":[{"hour":1,"start":"07:00","end":"07:45"},{"hour":2,"start":"07:45","end":"08:30"},{"hour":3,"start":"08:30","end":"09:30"},{"hour":4,"start":"09:30","end":"10:15"},{"hour":5,"start":"10:15","end":"11:00"},{"hour":6,"start":"11:00","end":"12:10"},{"hour":7,"start":"12:10","end":"12:50"},{"hour":8,"start":"12:50","end":"13:30"},{"hour":9,"start":"13:30","end":"14:10"},{"hour":10,"start":"14:10","end":"14:50"},{"hour":11,"start":"14:50","end":"15:30"}],"jumat":[{"hour":1,"start":"07:00","end":"07:45"},{"hour":2,"start":"07:45","end":"08:30"},{"hour":3,"start":"08:30","end":"09:30"},{"hour":4,"start":"09:30","end":"10:15"},{"hour":5,"start":"10:15","end":"11:00"},{"hour":6,"start":"11:00","end":"11:45"},{"hour":7,"start":"12:30","end":"13:15"},{"hour":8,"start":"13:15","end":"14:00"}]},"classes":[{"id":1,"name":"X DKV 1","subject":"Informatika","students":[{"id":"s_1793098511096_3d8di2","nis":"99-002","name":"SITI AMINAH"}],"attendance":{"s_1793098511096_3d8di2":{"1":"H"}},"meetings":1,"meetingsData":{"1":{"date":"2026-10-27","hour":1,"material":""}},"startHour":1,"endHour":3},{"id":2,"name":"X DKV 2","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":3,"name":"X DKV 3","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":4,"name":"X TAB 1","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":5,"name":"X TAB 2","subject":"Informatika","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":6,"name":"X TBSM 1","subject":"Pendidikan Agama Islam","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":7,"name":"X TBKR","subject":"Pendidikan Agama Islam","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":8,"name":"XI DKV 1","subject":"Pendidikan Agama Islam","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3},{"id":9,"name":"XI DKV 3","subject":"Produk Kreatif dan Kewirausahaan","students":[],"attendance":{},"meetings":0,"meetingsData":{},"startHour":1,"endHour":3}],"googleScriptUrl":"","teacherSchedule":[{"id":"ts_1","day":"Senin","className":"X DKV 1","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_2","day":"Selasa","className":"X DKV 1","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_3","day":"Rabu","className":"X DKV 2","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_4","day":"Kamis","className":"X DKV 3","startHour":1,"endHour":3,"subject":"Informatika"},{"id":"ts_5","day":"Jumat","className":"X TAB 1","startHour":1,"endHour":3,"subject":"Informatika"}],"updatedAt":1793098511297}</script>
 
 <div class="container">
   <header>
     <div class="school-info">
       <h1 id="headerSchool"> SMKN 1 TEST GONDANG</h1>
-      <p id="headerSub">Sistem Absensi Siswa • <span id="headerTA">TA 2026/2027</span> • <span id="headerClock">🕐 10:29:05</span></p>
+      <p id="headerSub">Sistem Absensi Siswa • <span id="headerTA">TA 2026/2027</span> • <span id="headerClock">🕐 10:55:10</span></p>
       <div class="teacher" id="headerTeacher">‍🏫 Guru: Suhardi, S. Pd. | 📖 Mapel: Informatika</div>
     </div>
     <div class="school-badge" id="headerBadge">9 Kelas • 50 Pertemuan</div>
@@ -165,6 +179,9 @@
       <div class="dropdown" id="mainMenuDropdown">
         <button class="btn-blue" onclick="toggleDropdown('mainMenuDropdownMenu')">⚡ Menu Aksi ▾</button>
         <div class="dropdown-menu show" id="mainMenuDropdownMenu">
+          <div class="dropdown-header">👤 Kelola Siswa</div>
+          <button class="dropdown-item" onclick="openAddStudentModal(); closeAllDropdowns();">➕ Tambah Siswa</button>
+          <div class="dropdown-divider"></div>
           <div class="dropdown-header">📥 Import / Export Data</div>
           <button class="dropdown-item" onclick="importExcel(); closeAllDropdowns();">📥 Import Excel Siswa</button>
           <button class="dropdown-item" onclick="exportExcel(); closeAllDropdowns();"> Export Excel Rekap</button>
@@ -179,6 +196,16 @@
           <button class="dropdown-item" onclick="downloadHTML(); closeAllDropdowns();"> Download HTML Aplikasi</button>
           <button class="dropdown-item text-red" onclick="resetData(); closeAllDropdowns();">🧹 Reset Data Siswa &amp; Absensi</button>
           <button class="dropdown-item text-red" onclick="resetTotal(); closeAllDropdowns();">🗑 Reset Total Aplikasi</button>
+        </div>
+      </div>
+      <!-- Meeting Action Dropdown Menu -->
+      <div class="dropdown" id="meetingMenuDropdown">
+        <button class="btn-purple" onclick="toggleDropdown('meetingMenuDropdownMenu')">⚡ Aksi Pertemuan ▾</button>
+        <div class="dropdown-menu" id="meetingMenuDropdownMenu">
+          <button class="dropdown-item" onclick="exportMeetingFile(); closeAllDropdowns();">📤 Export Pertemuan (JSON)</button>
+          <button class="dropdown-item" onclick="importMeetingFile(); closeAllDropdowns();">📥 Import Pertemuan (JSON)</button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" onclick="openSyncMeetingModal(); closeAllDropdowns();">👯 Samakan ke Kelas Lain</button>
         </div>
       </div>
     </div>
@@ -202,16 +229,6 @@
       <span id="meetingLabel" style="font-weight:bold; padding:0 5px;">Pertemuan 1</span>
       <button class="btn-gray" onclick="nextMeeting()">▶</button>
       <button class="btn-blue" onclick="addMeeting()">+ Pertemuan</button>
-      <!-- Meeting Action Dropdown Menu -->
-      <div class="dropdown" id="meetingMenuDropdown">
-        <button class="btn-purple" onclick="toggleDropdown('meetingMenuDropdownMenu')">⚡ Aksi Pertemuan ▾</button>
-        <div class="dropdown-menu dropdown-menu-right" id="meetingMenuDropdownMenu">
-          <button class="dropdown-item" onclick="exportMeetingFile(); closeAllDropdowns();">📤 Export Pertemuan (JSON)</button>
-          <button class="dropdown-item" onclick="importMeetingFile(); closeAllDropdowns();">📥 Import Pertemuan (JSON)</button>
-          <div class="dropdown-divider"></div>
-          <button class="dropdown-item" onclick="openSyncMeetingModal(); closeAllDropdowns();">👯 Samakan ke Kelas Lain</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -231,7 +248,7 @@
       </div>
     </div>
     <div class="clock-info">
-      <span>🕐 Waktu sekarang: <b>10:29:05</b></span>
+      <span>🕐 Waktu sekarang: <b>10:55:11</b></span>
       <span class="auto-badge">Auto: Jam Ke-5</span>
       <span>🟢 Sedang berlangsung</span>
       <button class="btn-blue" style="padding:3px 10px; font-size:11px; margin-left:auto;" onclick="autoDetectHour()"> Deteksi Ulang</button>
@@ -258,10 +275,10 @@
     <th style="width:80px;text-align:center">Status</th>
     <th style="width:110px;text-align:center">Aksi</th></tr></thead><tbody><tr>
       <td>1</td><td>99-002</td><td>SITI AMINAH</td>
-      <td class="status-cell status-H" onclick="cycleStatus('s_1793096945765_g7e371')">H</td>
+      <td class="status-cell status-H" onclick="cycleStatus('s_1793098511096_3d8di2')">H</td>
       <td style="text-align:center; display:flex; gap:4px; justify-content:center;">
-        <button class="btn-blue" style="padding:3px 8px;font-size:11px" onclick="openEditStudentModal('s_1793096945765_g7e371')">Edit</button>
-        <button class="btn-red" style="padding:3px 8px;font-size:11px" onclick="deleteStudent('s_1793096945765_g7e371')">Hapus</button>
+        <button class="btn-blue" style="padding:3px 8px;font-size:11px" onclick="openEditStudentModal('s_1793098511096_3d8di2')">Edit</button>
+        <button class="btn-red" style="padding:3px 8px;font-size:11px" onclick="deleteStudent('s_1793098511096_3d8di2')">Hapus</button>
       </td>
     </tr></tbody></table></div>
 
@@ -2521,6 +2538,7 @@ function saveStudent() {
 function cycleStatus(id) {
   const c = state.classes[currentClass];
   if (c.meetings === 0) return;
+  if (!c.attendance[id]) c.attendance[id] = {};
   const cur = c.attendance[id][currentMeeting] || 'H';
   c.attendance[id][currentMeeting] = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur)+1) % STATUS_CYCLE.length];
   render();
@@ -3031,6 +3049,7 @@ function autoSelectTodayClass(isManualTrigger = false) {
   if (foundIdx >= 0) {
     const classChanged = currentClass !== foundIdx;
     currentClass = foundIdx;
+    currentMeeting = Math.max(1, state.classes[currentClass].meetings || 1);
     const targetCls = state.classes[currentClass];
     if (match.subject && state.subjects.includes(match.subject)) {
       targetCls.subject = match.subject;
