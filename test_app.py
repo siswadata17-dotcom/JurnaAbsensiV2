@@ -22,6 +22,10 @@ def test_app():
         page.click("button:has-text('Test Spreadsheet')")
         assert page.is_visible("text=Masukkan Web App URL")
 
+        # Verify DAFTAR KELAS (CRUD) no longer has "Jam Ke-" inputs in settings modal
+        assert not page.is_visible("#class-start-0")
+        assert not page.is_visible("text=Jam Ke-") or page.is_visible("button:has-text('Settings')")
+
         # Edit school name in settings
         page.fill("#setSchoolName", "SMKN 1 TEST GONDANG")
         page.click("button:has-text('Simpan Semua')")
